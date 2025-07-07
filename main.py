@@ -3,7 +3,7 @@
 import argparse
 import torch.optim as optim
 from model import *
-from data import *
+from prm_data import *
 from utils import *
 from betty.engine import Engine
 from betty.problems import ImplicitProblem
@@ -11,8 +11,10 @@ from betty.configs import Config, EngineConfig
 import wandb
 from transformers import AdamW
 import numpy as np
-
-
+from copy import deepcopy
+import pandas as pd
+from eval_aime import *
+ 
 parser = argparse.ArgumentParser(description="DreamPRM")
 parser.add_argument('--train_json_file', type=str)
 parser.add_argument('--meta_json_file', type=str)
@@ -46,12 +48,27 @@ parser.add_argument("--batch_size", type=int, default=1)
 parser.add_argument("--max_epoch", type=int, default=120)
 parser.add_argument("--meta_interval", type=int, default=1)
 parser.add_argument("--paint_interval", type=int, default=20)
+parser.add_argument("--prm_loss", action="store_true")
+parser.add_argument("--model_type", type=str, default="token")
 
 args = parser.parse_args()
 print(args)
 set_seed(args.seed)
-domain_list = create_dataset_mapping(args.train_json_file)
+domain_list = {'Algebra':0,
+ 'Counting & Probability':1,
+ 'Geometry':2,
+ 'Intermediate Algebra':3,
+ 'Number Theory':4,
+ 'Prealgebra':5,
+ 'Precalculus':6}
 print(domain_list)
+
+
+
+tokenizer = AutoTokenizer.from_pretrained(args.reward_model, trust_remote_code=True)
+new_tokens = ['<PRM_STEP_SCORE>']
+num_added_tokens = tokenizer.add_tokens(new_tokens)
+
 
 sampler = None
 resume_idxes = None
@@ -61,13 +78,20 @@ resume_labels = None
     train_dataloader,
     meta_dataloader,
 ) = build_dataloader(
-    processor_path = args.reward_model,
-    train_json_file = args.train_json_file,
-    meta_json_file = args.meta_json_file,
+    tokenizer=tokenizer,
     train_batch_size= args.batch_size,
     meta_batch_size= args.batch_size,
+    last_only=args.prm_loss,
 )
-wandb.init(project="DreamPRM")
+
+dataloader_benchmark = build_inference_dataloader(
+    tokenizer=tokenizer,
+    batch_size= args.batch_size,
+    last_only=args.prm_loss,
+)
+
+
+wandb.init(project="DreamPRM-AIME", mode="offline")
 
 device = torch.device(args.device)
 criterion = nn.MSELoss()
@@ -84,22 +108,44 @@ class Upper(ImplicitProblem):
         return self.module(domain_strings, x)
 
     def training_step(self, batch):
-        # steps = [batch['1'], batch['2'], batch['3'], batch['4'], batch['5'],]
-        numeric_keys = [k for k in batch.keys() if k.isdigit()]
-        sorted_keys = sorted(numeric_keys, key=lambda x: int(x))
-        steps = [batch[key] for key in sorted_keys]
         labels = batch['labels'].to(device)
-        mean_score = 0
-        for i in steps:
-            score = self.inner(i['input_ids'].to(device),
-                                     i['attention_mask'].to(device),
-                                     i['pixel_values'].to(device),
-                                     i['image_grid_thw'].to(device))
-            mean_score += torch.log(score / (1 - score))
-        outputs = torch.sigmoid(mean_score / len(steps))
-        loss = criterion_meta(outputs, labels)
+        score = self.inner(batch['input_ids'].to(device),
+                                     batch['attention_mask'].to(device),
+                                     labels if not args.prm_loss else None, last_nly=args.prm_loss)
+        
+        if args.model_type == "token":
+            if args.prm_loss:
+                #### DreamPRM Product Loss
+                score = score[labels!=-100]
+                score = torch.log(score / (1 - score))
+                mean_score = torch.mean(score, dim=1)
+                outputs = torch.sigmoid(mean_score)
+                loss = criterion_meta(outputs, labels)
+            else:
+                ### avg cross entropy loss
+                score, loss = score
+        else:
+            nproblems = set(batch['index'])
+            score = torch.log(score / (1 - score))
+            outputs = []
+            for i in nproblems:
+                mean_score = 0
+                step = 0
+                for j in range(len(score)):
+                    if batch['index'][j] == i:
+                        mean_score += score[j]
+                        step += 1
+                mean_score /= step
+                
+                outputs.append(mean_score)
+                
+            outputs = torch.stack(outputs, device=device)
+            outputs = torch.sigmoid(outputs)
+            loss = criterion_meta(outputs, labels)
+                
+        
         upper_loss.append(loss.item())
-        print(outputs.item(), labels.item(), loss.item())
+
         # torch.cuda.empty_cache()
         if len(upper_loss) == 10:
             mean_outer_loss = np.mean(upper_loss)
@@ -134,15 +180,26 @@ class Lower(ImplicitProblem):
     def training_step(self, batch):
         input_ids = batch['input_ids'].to(device)
         attention_mask = batch['attention_mask'].to(device)
-        pixel_values = batch['pixel_values'].to(device)
-        image_grid_thw = batch['image_grid_thw'].to(device)
         labels = batch['label'].to(dtype=torch.float).to(device)
-        domain_strings = batch['dataset']
-        outputs = self.forward(input_ids=input_ids, attention_mask=attention_mask, pixel_values=pixel_values,
-                     image_grid_thw=image_grid_thw)
+        domain_strings = batch['index']
+        score = self.forward(input_ids=input_ids, attention_mask=attention_mask, labels=labels if not args.prm_loss else None)
+        
+        if args.model_type == "token":
+            if args.prm_loss:
+                score = score[labels!=-100]
+                score = torch.log(score / (1 - score))
+                mean_score = torch.mean(score, dim=1)
+                outputs = torch.sigmoid(mean_score)
+                loss = criterion(outputs, labels)
+            else:
+                score, loss = score
+                
+        else:
+            loss = criterion(score, labels)
+        
         if args.baseline or args.retrain:
-            return criterion(outputs, labels)
-        loss = criterion(outputs, labels)
+            return loss
+
         weighted_loss = self.upper(domain_strings, loss)
         lower_loss.append(loss.item())
         lower_weighted_loss.append(weighted_loss.item())
@@ -161,7 +218,10 @@ class Lower(ImplicitProblem):
         return train_dataloader
 
     def configure_module(self):
-        return QwenVL_RM(device)
+        if args.model_type == "token":
+            return QwenMathTokenClf_RM(device, args.model_path)
+        else:
+            return QwenMathCondGen_RM(device, args.model_path)
 
     def configure_optimizer(self):
         optimizer = AdamW(
@@ -189,7 +249,63 @@ class ReweightingEngine(Engine):
             self.outer.state_dict(),
             f"{args.weights_path}/domain_weights.pt",
         )
-        return {"loss": 1}
+        
+        all_scores = {}
+        for ds_name in dataloader_benchmark:
+            for model_name in dataloader_benchmark[ds_name]:
+                test_dataloader = dataloader_benchmark[ds_name][model_name]
+                predictions = None
+
+                for batch in test_dataloader:
+                    score = self.inner(batch['input_ids'].to(device),
+                                        batch['attention_mask'].to(device),
+                                        last_nly=args.prm_loss)
+
+                    if args.model_type == "token":
+                        labels = batch['labels'].to(device)
+                        score = score[labels!=-100]
+                        score = torch.log(score / (1 - score))
+                        mean_score = torch.mean(score, dim=1)
+                        outputs = torch.sigmoid(mean_score) ## (B, )
+
+
+                    else:
+                        nproblems = set(batch['index'])
+                        score = torch.log(score / (1 - score))
+                        outputs = []
+                        for i in nproblems:
+                            mean_score = 0
+                            step = 0
+                            for j in range(len(score)):
+                                if batch['index'][j] == i:
+                                    mean_score += score[j]
+                                    step += 1
+                            mean_score /= step
+
+                            outputs.append(mean_score)
+
+                        outputs = torch.stack(outputs, device=device)
+                        outputs = torch.sigmoid(outputs)
+
+                    if predictions is None:
+                        predictions = outputs.cpu().numpy()
+                    else:
+                        predictions = np.concatenate((predictions, outputs.cpu().numpy()), axis=0)
+
+                dataset = test_dataloader.dataset.data
+                predictions, score = eval(dataset, predictions)
+
+                print(f"Dataset: {ds_name}, Model: {model_name}, Score: {score}")
+                df = pd.DataFrame(predictions)
+                df.to_csv(f"{args.weights_path}/{ds_name}_{model_name}_predictions.csv", index=False)
+                wandb.log({f"{ds_name}/{model_name}_score": score})
+                all_scores[f"{ds_name}_{model_name}"] = score
+        
+        
+            
+        
+        all_scores["loss"] = 1
+        return all_scores
 
 
 upper_config = Config(type="darts", precision=args.precision, retain_graph=True)

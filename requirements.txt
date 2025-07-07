@@ -12,3 +12,7 @@ torch==2.5.1
 torchvision==0.20.1
 transformers==4.51.3
 wandb==0.18.5
+sympy
+word2number
+timeout-decorator
+latex2sympy2==1.9.1

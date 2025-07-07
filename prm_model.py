@@ -1,4 +1,4 @@
-from transformers import Qwen2VLForConditionalGeneration, LlavaOnevisionForConditionalGeneration, AutoModelForCausalLM, AutoModelForTokenClassification, AutoTokenizer
+from transformers import Qwen2VLForConditionalGeneration, AutoModelForTokenClassification, AutoTokenizer, AutoModelForCausalLM
 import torch.nn.functional as F
 from peft import LoraConfig, get_peft_model
 import torch
@@ -12,53 +12,6 @@ import torch.nn as nn
 #     lora_dropout=0.1,  # Dropout probability for LoRA layers
 #     bias="none"      # Whether to apply LoRA to biases ("none", "all", or "lora_only")
 # )
-
-class QwenVL_RM(nn.Module):
-    def __init__(self, device, model_path="Qwen/Qwen2-VL-2B-Instruct"):
-        super(QwenVL_RM, self).__init__()
-        self.base_model = Qwen2VLForConditionalGeneration.from_pretrained(
-            model_path,
-            torch_dtype=torch.bfloat16,
-            attn_implementation="flash_attention_2",
-            device_map=device,
-        )
-        # self.lora_model = get_peft_model(base_model, lora_config)
-        self.LN = nn.Linear(self.base_model.config.vocab_size, 1)
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, input_ids, attention_mask, pixel_values, image_grid_thw):
-        outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask,
-                                  pixel_values = pixel_values, image_grid_thw = image_grid_thw)
-        outputs = outputs.logits[:, -1, :].to(dtype=torch.float)
-        # print(outputs)
-        value_outputs = self.LN(outputs)
-        value_outputs = self.sigmoid(value_outputs)
-        # print(value_outputs)
-        return value_outputs.squeeze(dim=1)
-
-class Llava_RM(nn.Module):
-    def __init__(self, device):
-        super(Llava_RM, self).__init__()
-        self.base_model = LlavaOnevisionForConditionalGeneration.from_pretrained(
-    "llava-hf/llava-onevision-qwen2-0.5b-ov-hf",
-            torch_dtype=torch.bfloat16,
-            low_cpu_mem_usage=True,
-            use_flash_attention_2=True
-        ).to(0)
-        # self.lora_model = get_peft_model(base_model, lora_config)
-        self.LN = nn.Linear(self.base_model.vocab_size, 1)
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, input_ids, attention_mask, pixel_values, image_sizes):
-        outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask,
-                                  pixel_values = pixel_values, image_sizes = image_sizes)
-        outputs = outputs.logits[:, -1, :].to(dtype=torch.float)
-        # print(outputs)
-        value_outputs = self.LN(outputs)
-        value_outputs = self.sigmoid(value_outputs)
-        # print(value_outputs)
-        return value_outputs.squeeze(dim=1)
-
 
 class QwenMathTokenClf_RM(nn.Module):
     def __init__(self, device, model_path = "Qwen/Qwen2.5-Math-7B-Instruct"):
@@ -90,7 +43,8 @@ class QwenMathTokenClf_RM(nn.Module):
 
         logits = outputs.logits.to(dtype=torch.float)
         # print(outputs)
-        logits = F.softmax(logits)[..., 1]  # Assuming the second class is the one we want to predict
+        logits = logits[..., 1]
+        # logits = F.softmax(logits[..., 1]  # Assuming the second class is the one we want to predict
         # print(value_outputs)
         if labels is not None:
             return logits.squeeze(dim=1)
@@ -99,7 +53,7 @@ class QwenMathTokenClf_RM(nn.Module):
         
         
 class QwenMathCondGen_RM(nn.Module):
-    def __init__(self, device, model_path="Qwen/Qwen2.5-Math-7B-Instruct"):
+    def __init__(self, device, model_path="Qwen/Qwen2-VL-2B-Instruct"):
         super(QwenMathCondGen_RM, self).__init__()
         self.base_model = AutoModelForCausalLM.from_pretrained(
     model_path, 
@@ -111,27 +65,16 @@ class QwenMathCondGen_RM(nn.Module):
         # self.lora_model = get_peft_model(base_model, lora_config)
         self.LN = nn.Linear(self.base_model.config.vocab_size, 1)
         self.sigmoid = nn.Sigmoid()
-        
-    def add_token(self):
-        tokenizer = AutoTokenizer.from_pretrained(self.model_path, trust_remote_code=True)
-        new_tokens = ['<PRM_STEP_SCORE>']
-        num_added_tokens = tokenizer.add_tokens(new_tokens)
-        if num_added_tokens > 0:
-            self.base_model.resize_token_embeddings(len(tokenizer))
-            print(f"Added {num_added_tokens} new tokens to the tokenizer and model. The token is {new_tokens[0]}.")
-        else:
-            print("No new tokens were added.")
-            
-        return tokenizer
 
     def forward(self, input_ids, attention_mask):
         outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask)
         outputs = outputs.logits[:, -1, :].to(dtype=torch.float)
         # print(outputs)
         value_outputs = self.LN(outputs)
-        value_outputs = self.sigmoid(value_outputs)
+        # value_outputs = self.sigmoid(value_outputs)
         # print(value_outputs)
         return value_outputs.squeeze(dim=1)
+
 
 class DomainTable(nn.Module):
     def __init__(self, domain_to_idx):
@@ -168,7 +111,7 @@ class DomainTable(nn.Module):
         normalized_weights = positive_weights / mean_weights
 
         # Convert domain strings to indices matching batch order
-        idxes = [self.domain_to_idx[d] for d in domain_strings]
+        idxes = domain_strings
         idxes = torch.tensor(idxes, dtype=torch.long, device=x.device)  # [batch_size]
 
         # Retrieve domain weights for each sample in the batch [batch_size]
