@@ -1,9 +1,10 @@
 import torch
 from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
 import re
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
 import pandas as pd
 import os
+import numpy as np
 
 subjects_map = {'Algebra':0,
  'Counting & Probability':1,
@@ -71,19 +72,19 @@ class QwenMathDataset(Dataset):
     [A, B, C] -> [T, F, T]
     '''
     def __init__(self, data, tokenizer, special_tokens=True, inference=False):
-        self.data = data
+        self.dataset = data
         self.tokenizer = tokenizer
         self.special_tokens = special_tokens
         self.inference = inference
         
     def __len__(self):
-        return len(self.data)
+        return len(self.dataset)
 
     def __getitem__(self, idx):
-        prompt = self.data[idx]['prompt']
-        completions = self.data[idx]['completions']
-        raw_labels = self.data[idx]['labels']
-        dset = subjects_map[self.data[idx]['subject']]
+        prompt = self.dataset[idx]['prompt']
+        completions = self.dataset[idx]['completions']
+        raw_labels = self.dataset[idx]['labels']
+        dset = subjects_map[self.dataset[idx]['subject']]
 
         if self.special_tokens:
             text = chat_template(prompt, completions)
@@ -122,17 +123,17 @@ class QwenMathMetaDataset(Dataset):
     where A, B, C are the steps of the trajectory.
     '''
     def __init__(self, data, tokenizer):
-        self.data = data
+        self.dataset = data
         self.tokenizer = tokenizer
 
     def __len__(self):
-        return len(self.data)
+        return len(self.dataset)
 
     def __getitem__(self, idx):
-        prompt = self.data[idx]['prompt']
-        dset = subjects_map[self.data[idx]['subject']]
-        completions = self.data[idx]['completions']
-        raw_labels = self.data[idx]['labels']
+        prompt = self.dataset[idx]['prompt']
+        dset = subjects_map[self.dataset[idx]['subject']]
+        completions = self.dataset[idx]['completions']
+        raw_labels = self.dataset[idx]['labels']
 
         inputs, attns, labels, index = [], [], [], []
         
@@ -157,15 +158,15 @@ class QwenMathMetaDataset(Dataset):
 
 # class QwenMathDatasetInference(Dataset):
 #     def __init__(self, data, tokenizer):
-#         self.data = data
+#         self.dataset = data
 #         self.tokenizer = tokenizer
         
 #     def __len__(self):
-#         return len(self.data)
+#         return len(self.dataset)
 
 #     def __getitem__(self, idx):
-#         prompt = self.data[idx]['prompt']
-#         completions = self.data[idx]['completions']
+#         prompt = self.dataset[idx]['prompt']
+#         completions = self.dataset[idx]['completions']
 #         text = chat_template(prompt, completions)
 #         model_inputs = self.tokenizer([text], return_tensors="pt")
 #         return [model_inputs['input_ids']], [model_inputs['attention_mask']]
@@ -173,15 +174,15 @@ class QwenMathMetaDataset(Dataset):
 
 # class QwenMathMetaDatasetInference(Dataset):
 #     def __init__(self, data, tokenizer):
-#         self.data = data
+#         self.dataset = data
 #         self.tokenizer = tokenizer
 
 #     def __len__(self):
-#         return len(self.data)
+#         return len(self.dataset)
 
 #     def __getitem__(self, idx):
-#         prompt = self.data[idx]['prompt']
-#         completions = self.data[idx]['completions']
+#         prompt = self.dataset[idx]['prompt']
+#         completions = self.dataset[idx]['completions']
 #         inputs, attns = [], []
         
 #         for step_idx in range(1, len(completions)+1):
@@ -224,10 +225,10 @@ def build_inference_dataloader(
 
     for ds in os.listdir(paths):
         dataloader_benchmark[ds] = {}
-        ds = os.path.join(paths, ds)
+        ds_ = os.path.join(paths, ds)
         
-        for model_out in os.listdir(ds):
-            model_out = os.path.join(ds, model_out)
+        for model_out in os.listdir(ds_):
+            model_out = os.path.join(ds_, model_out)
             path = os.listdir(model_out)[0]
             path = os.path.join(model_out, path)
             output = pd.read_json(path_or_buf=path, lines=True)
@@ -238,11 +239,12 @@ def build_inference_dataloader(
             output = output.explode(["generated_responses", "answers_correctness", "generated_answers"]).reset_index(drop=True)
             output["generated_responses"] = output["generated_responses"].apply(lambda x: x.split("\n\n"))
             output.rename(columns={"generated_responses": "completions"}, inplace=True)
-            output["labels"] = output["completions"].apply(lambda completions: [True] * len(completions))
-            output["labels"] = [[output['answers_correctness']] * len(completions) for completions in output["completions"]]
-            ### check if gold_answer value is present in list of generated_Answers
+            output["labels"] = [
+                        [val] * len(completions)
+                        for val, completions in zip(output["answers_correctness"], output["completions"])
+                    ]
             output["subject"] = "Others" ## filler values
-            
+
             test_ds = Dataset.from_pandas(output)
     
             if last_only:

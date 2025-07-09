@@ -16,8 +16,6 @@ import pandas as pd
 from eval_aime import *
  
 parser = argparse.ArgumentParser(description="DreamPRM")
-parser.add_argument('--train_json_file', type=str)
-parser.add_argument('--meta_json_file', type=str)
 parser.add_argument('--weights_path', type=str)
 parser.add_argument("--iteration_num", type=int, default=10000)
 parser.add_argument("--save_every_iterations", type=int, default=1000)
@@ -39,7 +37,7 @@ parser.add_argument("--nesterov", type=bool, default=False)
 parser.add_argument("--weight_decay", type=float, default=1e-3)
 parser.add_argument("--meta_lr", type=float, default=0.01)
 parser.add_argument("--meta_weight_decay", type=float, default=0.0)
-parser.add_argument("--reward_model", type=str, default="Qwen/Qwen2-VL-2B-Instruct")
+parser.add_argument("--reward_model", type=str, default="Qwen/Qwen2.5-Math-7B-Instruct")
 parser.add_argument("--num_meta", type=int, default=1000)
 parser.add_argument("--imbalanced_factor", type=int, default=None)
 parser.add_argument("--corruption_type", type=str, default=None)
@@ -90,8 +88,9 @@ dataloader_benchmark = build_inference_dataloader(
     last_only=args.prm_loss,
 )
 
+### log the configurations to wandb
 
-wandb.init(project="DreamPRM-AIME", mode="offline")
+wandb.init(project="DreamPRM-AIME", mode="online", config=args)
 
 device = torch.device(args.device)
 criterion = nn.MSELoss()
@@ -111,21 +110,22 @@ class Upper(ImplicitProblem):
         labels = batch['labels'].to(device)
         score = self.inner(batch['input_ids'].to(device),
                                      batch['attention_mask'].to(device),
-                                     labels if not args.prm_loss else None, last_nly=args.prm_loss)
+                                     labels if not args.prm_loss else None)
         
         if args.model_type == "token":
             if args.prm_loss:
-                #### DreamPRM Product Loss
+                ### dreamprm loss, score -> (B, T,)
                 score = score[labels!=-100]
                 score = torch.log(score / (1 - score))
-                mean_score = torch.mean(score, dim=1)
-                outputs = torch.sigmoid(mean_score)
+                mean_score = torch.mean(score, dim=1) # (B, )
+                outputs = torch.sigmoid(mean_score) # (B, )
                 loss = criterion_meta(outputs, labels)
             else:
                 ### avg cross entropy loss
                 score, loss = score
         else:
-            nproblems = set(batch['index'])
+            nproblems = set(batch['index']) # [0, 1, 2, B_Size-1]
+            # score -> (B * T*(T+1)/2) So [A_0_1, A_0_2,.. B_0_1, B_0_2,...] in cummulative order
             score = torch.log(score / (1 - score))
             outputs = []
             for i in nproblems:
@@ -139,7 +139,8 @@ class Upper(ImplicitProblem):
                 
                 outputs.append(mean_score)
                 
-            outputs = torch.stack(outputs, device=device)
+            ## outputs -> (B, )
+            outputs = torch.stack(outputs, device=device) # (B, )
             outputs = torch.sigmoid(outputs)
             loss = criterion_meta(outputs, labels)
                 
@@ -185,16 +186,19 @@ class Lower(ImplicitProblem):
         score = self.forward(input_ids=input_ids, attention_mask=attention_mask, labels=labels if not args.prm_loss else None)
         
         if args.model_type == "token":
-            if args.prm_loss:
-                score = score[labels!=-100]
-                score = torch.log(score / (1 - score))
-                mean_score = torch.mean(score, dim=1)
-                outputs = torch.sigmoid(mean_score)
-                loss = criterion(outputs, labels)
-            else:
-                score, loss = score
+            # if args.prm_loss:
+            #     ### dreamprm loss, score -> (B, T,)
+            #     score = score[labels!=-100]
+            #     score = torch.log(score / (1 - score))
+            #     mean_score = torch.mean(score, dim=1) #  (B,)
+            #     outputs = torch.sigmoid(mean_score)  #  (B,)
+            #     loss = criterion(outputs, labels)
+            # else:
+            ### avg cross entropy loss
+            score, loss = score
                 
         else:
+            # score -> (B, )
             loss = criterion(score, labels)
         
         if args.baseline or args.retrain:
@@ -258,10 +262,10 @@ class ReweightingEngine(Engine):
 
                 for batch in test_dataloader:
                     score = self.inner(batch['input_ids'].to(device),
-                                        batch['attention_mask'].to(device),
-                                        last_nly=args.prm_loss)
+                                        batch['attention_mask'].to(device))
 
                     if args.model_type == "token":
+                        # score -> (B, T,)
                         labels = batch['labels'].to(device)
                         score = score[labels!=-100]
                         score = torch.log(score / (1 - score))
@@ -270,7 +274,8 @@ class ReweightingEngine(Engine):
 
 
                     else:
-                        nproblems = set(batch['index'])
+                        # score -> (B * T*(T+1)/2) So [A_0_1, A_0_2,.. B_0_1, B_0_2,...] in cummulative order
+                        nproblems = set(batch['index']) # [0, 1, 2, B_Size-1]
                         score = torch.log(score / (1 - score))
                         outputs = []
                         for i in nproblems:
@@ -284,7 +289,7 @@ class ReweightingEngine(Engine):
 
                             outputs.append(mean_score)
 
-                        outputs = torch.stack(outputs, device=device)
+                        outputs = torch.stack(outputs, device=device) # (B, )
                         outputs = torch.sigmoid(outputs)
 
                     if predictions is None:
@@ -292,7 +297,7 @@ class ReweightingEngine(Engine):
                     else:
                         predictions = np.concatenate((predictions, outputs.cpu().numpy()), axis=0)
 
-                dataset = test_dataloader.dataset.data
+                dataset = test_dataloader.dataset.dataset
                 predictions, score = eval(dataset, predictions)
 
                 print(f"Dataset: {ds_name}, Model: {model_name}, Score: {score}")
@@ -302,7 +307,7 @@ class ReweightingEngine(Engine):
                 all_scores[f"{ds_name}_{model_name}"] = score
         
         
-            
+        weights = self.upper.module.raw_weights
         
         all_scores["loss"] = 1
         return all_scores

@@ -1,1 +1,1 @@
-python main.py --train_json_file "data/train.json" --meta_json_file "data/meta.json" --weights_path "weights"
+python main.py --weights_path "weights" --reward_model "Qwen/Qwen2.5-Math-7B-Instruct"
