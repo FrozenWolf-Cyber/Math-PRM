@@ -3,7 +3,6 @@ import random
 import numpy as np
 import torch
 from time import sleep
-from qwen_vl_utils import process_vision_info
 
 
 def set_cudnn(device="cuda"):

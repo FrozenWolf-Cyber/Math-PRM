@@ -1,7 +1,8 @@
 import torch
 from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
 import re
-from datasets import load_dataset, Dataset
+from datasets import load_dataset
+from datasets import Dataset as HF_Dataset
 import pandas as pd
 import os
 import numpy as np
@@ -38,45 +39,19 @@ Answer:
 
 
 
-def collate_merge_minibatch(batch):
-    names = ["input_ids", "attention_mask", "labels", "index"]
-    merged = {}
 
-    for name_idx, item in enumerate(zip(*batch)):
-        j = []
-        for i in item:
-            j+=i
-        
-        if isinstance(j[0], torch.Tensor):
-            max_len = max([i.shape[-1] for i in j ])
-        for i in range(len(j)):    
-            if isinstance(j[i], torch.Tensor):
-                if names[name_idx] == "input_ids":
-                    j[i] = torch.cat((j[i], torch.ones(1, max_len - j[i].shape[-1])*tokenizer.pad_token_id), dim=-1)
-                elif names[name_idx] == "attention_mask":
-                    j[i] = torch.cat((j[i], torch.zeros(1, max_len - j[i].shape[-1])), dim=-1)
-                elif names[name_idx] == "labels":
-                    j[i] = torch.cat((j[i], torch.ones(1, max_len - j[i].shape[-1])*-100), dim=-1)
-
-        if isinstance(j[0], torch.Tensor):
-            j = torch.cat(j, dim=0)
-        
-        merged[names[name_idx]] = j
-        
-    return merged
-        
 
 class QwenMathDataset(Dataset):
     '''
     This one generates a single trajectory per iteration and ALL steps accuracy like:
     [A, B, C] -> [T, F, T]
     '''
-    def __init__(self, data, tokenizer, special_tokens=True, inference=False):
+    def __init__(self, data, tokenizer, special_tokens=True, inference=False, has_subjects=True):
         self.dataset = data
         self.tokenizer = tokenizer
         self.special_tokens = special_tokens
         self.inference = inference
-        
+        self.has_subjects = has_subjects
     def __len__(self):
         return len(self.dataset)
 
@@ -84,7 +59,10 @@ class QwenMathDataset(Dataset):
         prompt = self.dataset[idx]['prompt']
         completions = self.dataset[idx]['completions']
         raw_labels = self.dataset[idx]['labels']
-        dset = subjects_map[self.dataset[idx]['subject']]
+        if  not self.has_subjects:
+            dset = subjects_map['Others']
+        else:
+            dset = subjects_map[self.dataset[idx]['subject']]
 
         if self.special_tokens:
             text = chat_template(prompt, completions)
@@ -122,16 +100,16 @@ class QwenMathMetaDataset(Dataset):
     ]
     where A, B, C are the steps of the trajectory.
     '''
-    def __init__(self, data, tokenizer):
+    def __init__(self, data, tokenizer, inference=False):
         self.dataset = data
         self.tokenizer = tokenizer
+        self.inference = inference
 
     def __len__(self):
         return len(self.dataset)
 
     def __getitem__(self, idx):
         prompt = self.dataset[idx]['prompt']
-        dset = subjects_map[self.dataset[idx]['subject']]
         completions = self.dataset[idx]['completions']
         raw_labels = self.dataset[idx]['labels']
 
@@ -149,7 +127,11 @@ class QwenMathMetaDataset(Dataset):
             labels.append(label)
             index.append(idx)
 
-        return inputs, attns, labels, index
+        if self.inference:
+            correctness = 1
+        else:
+            correctness = self.dataset[idx]['correctness']
+        return inputs, attns, labels, index, [correctness]
 
 
 
@@ -197,26 +179,63 @@ class QwenMathMetaDataset(Dataset):
     
     
 def build_dataloader(
-        tokenizer, train_batch_size, meta_batch_size, last_only=False
+        tokenizer, train_batch_size, meta_batch_size, last_only=False, meta_dataset="AIME" # "AIME" or "PRM800K"
 ):
+
+
+    def collate_merge_minibatch(batch):
+        if len(batch[0]) == 4:
+            names = ["input_ids", "attention_mask", "labels", "index"]
+        elif len(batch[0]) == 5:
+            names = ["input_ids", "attention_mask", "labels", "dataset", "correctness"]
+        else:
+            raise ValueError("Batch items must contain 4 or 5 elements.")
+
+        merged = {}
+
+        for name_idx, item in enumerate(zip(*batch)):
+            j = []
+            for i in item:
+                j+=i
+
+            if isinstance(j[0], torch.Tensor):
+                max_len = max([i.shape[-1] for i in j ])
+            for i in range(len(j)):    
+                if isinstance(j[i], torch.Tensor):
+                    if names[name_idx] == "input_ids":
+                        j[i] = torch.cat((j[i], torch.ones(1, max_len - j[i].shape[-1])*tokenizer.pad_token_id), dim=-1)
+                    elif names[name_idx] == "attention_mask":
+                        j[i] = torch.cat((j[i], torch.zeros(1, max_len - j[i].shape[-1])), dim=-1)
+                    elif names[name_idx] == "labels":
+                        j[i] = torch.cat((j[i], torch.ones(1, max_len - j[i].shape[-1])*-100), dim=-1)
+                    elif names[name_idx] == "correctness":
+                        j[i] = torch.tensor(j[i]).float()
+
+            if isinstance(j[0], torch.Tensor):
+                j = torch.cat(j, dim=0)
+
+            merged[names[name_idx]] = j
+
+        return merged
+
 
     data = load_dataset("FrozenWolf/prm800k")
     
     train_dataset = QwenMathDataset(data['train'], tokenizer, special_tokens=last_only)
-    if last_only:
-        meta_dataset = QwenMathMetaDataset(data['test'], tokenizer)
+
+    if meta_dataset == "AIME":
+        meta_dataset = load_dataset("FrozenWolf/Gemini-AIME-Meta")['train']
     else:
-        meta_dataset =  QwenMathDataset(data['test'], tokenizer)
+        meta_dataset = data['test']
+    if last_only:
+        meta_dataset = QwenMathMetaDataset(meta_dataset, tokenizer)
+    else:
+        meta_dataset =  QwenMathDataset(meta_dataset, tokenizer, has_subjects=False)
         
     train_dataloader = DataLoader(train_dataset, batch_size=train_batch_size, shuffle=True, collate_fn=collate_merge_minibatch)
+    next(iter(train_dataloader))  
     meta_dataloader = DataLoader(meta_dataset, batch_size=meta_batch_size, shuffle=True, collate_fn=collate_merge_minibatch)
-
-    return train_dataloader, meta_dataloader
-
-
-def build_inference_dataloader(
-        tokenizer, batch_size, last_only=False
-):
+    next(iter(meta_dataloader))  
 
     paths = "aime_outputs/"
     
@@ -245,16 +264,18 @@ def build_inference_dataloader(
                     ]
             output["subject"] = "Others" ## filler values
 
-            test_ds = Dataset.from_pandas(output)
+            test_ds = HF_Dataset.from_pandas(output)
     
             if last_only:
-                dataset = QwenMathMetaDataset(test_ds, tokenizer)
+                dataset = QwenMathMetaDataset(test_ds, tokenizer, inference=True) 
             else:
-                dataset = QwenMathDataset(test_ds, tokenizer, special_tokens=last_only)
+                dataset = QwenMathDataset(test_ds, tokenizer, special_tokens=last_only, has_subjects=False)
 
-            dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_merge_minibatch)
+            dataloader = DataLoader(dataset, batch_size=meta_batch_size, shuffle=False, collate_fn=collate_merge_minibatch)
 
             dataloader_benchmark[ds][model_out] = dataloader
+            next(iter(dataloader))
 
 
-    return dataloader_benchmark
+
+    return train_dataloader, meta_dataloader, dataloader_benchmark

@@ -1,1 +1,1 @@
-python main.py --weights_path "weights" --reward_model "Qwen/Qwen2.5-Math-7B-Instruct"
+python main.py --weights_path "weights" --reward_model "Qwen/Qwen2.5-Math-7B-Instruct" --batch_size 4 --prm_loss --model_type "classifier" --meta_dataset "AIME"

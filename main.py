@@ -48,6 +48,7 @@ parser.add_argument("--meta_interval", type=int, default=1)
 parser.add_argument("--paint_interval", type=int, default=20)
 parser.add_argument("--prm_loss", action="store_true")
 parser.add_argument("--model_type", type=str, default="token")
+parser.add_argument("--meta_dataset", type=str, default="AIME", help="AIME or PRM800K")
 
 args = parser.parse_args()
 print(args)
@@ -75,18 +76,15 @@ resume_labels = None
 (
     train_dataloader,
     meta_dataloader,
+    dataloader_benchmark
 ) = build_dataloader(
     tokenizer=tokenizer,
     train_batch_size= args.batch_size,
     meta_batch_size= args.batch_size,
     last_only=args.prm_loss,
+    meta_dataset=args.meta_dataset,
 )
 
-dataloader_benchmark = build_inference_dataloader(
-    tokenizer=tokenizer,
-    batch_size= args.batch_size,
-    last_only=args.prm_loss,
-)
 
 ### log the configurations to wandb
 
@@ -107,23 +105,25 @@ class Upper(ImplicitProblem):
         return self.module(domain_strings, x)
 
     def training_step(self, batch):
-        labels = batch['labels'].to(device)
+        labels = batch['labels'].to(device) ## (B, T)
+        correctness = batch['correctness'].to(device) ## (B, )
         score = self.inner(batch['input_ids'].to(device),
                                      batch['attention_mask'].to(device),
                                      labels if not args.prm_loss else None)
         
         if args.model_type == "token":
-            if args.prm_loss:
+            if args.prm_loss: ### using overall problem solution correctness
                 ### dreamprm loss, score -> (B, T,)
                 score = score[labels!=-100]
                 score = torch.log(score / (1 - score))
                 mean_score = torch.mean(score, dim=1) # (B, )
                 outputs = torch.sigmoid(mean_score) # (B, )
-                loss = criterion_meta(outputs, labels)
+                loss = criterion_meta(outputs, correctness)
             else:
-                ### avg cross entropy loss
+                ### avg cross entropy loss -> per step annotations
                 score, loss = score
         else:
+            ### using overall problem solution correctness
             nproblems = set(batch['index']) # [0, 1, 2, B_Size-1]
             # score -> (B * T*(T+1)/2) So [A_0_1, A_0_2,.. B_0_1, B_0_2,...] in cummulative order
             score = torch.log(score / (1 - score))
@@ -140,9 +140,10 @@ class Upper(ImplicitProblem):
                 outputs.append(mean_score)
                 
             ## outputs -> (B, )
+            ## label -> ## (B * T*(T+1)/2)
             outputs = torch.stack(outputs, device=device) # (B, )
             outputs = torch.sigmoid(outputs)
-            loss = criterion_meta(outputs, labels)
+            loss = criterion_meta(outputs, correctness)
                 
         
         upper_loss.append(loss.item())
@@ -187,12 +188,12 @@ class Lower(ImplicitProblem):
         
         if args.model_type == "token":
             # if args.prm_loss:
-            #     ### dreamprm loss, score -> (B, T,)
-            #     score = score[labels!=-100]
-            #     score = torch.log(score / (1 - score))
-            #     mean_score = torch.mean(score, dim=1) #  (B,)
-            #     outputs = torch.sigmoid(mean_score)  #  (B,)
-            #     loss = criterion(outputs, labels)
+            # #     ### dreamprm loss, score -> (B, T,)
+            # #     score = score[labels!=-100]
+            # #     score = torch.log(score / (1 - score))
+            # #     mean_score = torch.mean(score, dim=1) #  (B,)
+            # #     outputs = torch.sigmoid(mean_score)  #  (B,)
+            # #     loss = criterion(outputs, labels)
             # else:
             ### avg cross entropy loss
             score, loss = score
