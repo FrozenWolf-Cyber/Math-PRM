@@ -1,4 +1,3 @@
-from model import QwenVL_RM
 import random
 import numpy as np
 import torch

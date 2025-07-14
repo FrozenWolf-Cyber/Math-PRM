@@ -26,6 +26,7 @@ parser.add_argument("--precision", type=str, default="bf16")
 parser.add_argument("--strategy", type=str, default="default")
 parser.add_argument("--rollback", action="store_true")
 parser.add_argument("--baseline", action="store_true")
+parser.add_argument("--retrain", action="store_true")
 parser.add_argument("--seed", type=int, default=1)
 parser.add_argument("--local_rank", type=int, default=0)
 parser.add_argument("--lr", type=float, default=5e-7)
@@ -42,13 +43,15 @@ parser.add_argument("--num_meta", type=int, default=1000)
 parser.add_argument("--imbalanced_factor", type=int, default=None)
 parser.add_argument("--corruption_type", type=str, default=None)
 parser.add_argument("--corruption_ratio", type=float, default=0.0)
-parser.add_argument("--batch_size", type=int, default=1)
+parser.add_argument("--train_batch_size", type=int, default=4)
+parser.add_argument("--meta_batch_size", type=int, default=1)
 parser.add_argument("--max_epoch", type=int, default=120)
 parser.add_argument("--meta_interval", type=int, default=1)
 parser.add_argument("--paint_interval", type=int, default=20)
-parser.add_argument("--prm_loss", action="store_true")
+parser.add_argument("--dreamprm_loss", action="store_true")
 parser.add_argument("--model_type", type=str, default="token")
-parser.add_argument("--meta_dataset", type=str, default="AIME", help="AIME or PRM800K")
+parser.add_argument("--meta_dataset", type=str, default="AIME", help="AIME or PRM800K or both")
+parser.add_argument("--sanity_check", action="store_true")
 
 args = parser.parse_args()
 print(args)
@@ -60,8 +63,21 @@ domain_list = {'Algebra':0,
  'Number Theory':4,
  'Prealgebra':5,
  'Precalculus':6}
-print(domain_list)
 
+inv_domain_list = {v: k for k, v in domain_list.items()}
+
+print(domain_list)
+sanity_check = args.sanity_check
+if sanity_check:
+    print("============ SANITY CHECK MODE ============")
+
+if not os.path.exists(args.weights_path):
+    os.makedirs(args.weights_path)
+
+if sanity_check:
+    args.save_every_iterations = 2
+    args.iteration_num = 5
+    args.max_epoch = 2
 
 
 tokenizer = AutoTokenizer.from_pretrained(args.reward_model, trust_remote_code=True)
@@ -79,20 +95,23 @@ resume_labels = None
     dataloader_benchmark
 ) = build_dataloader(
     tokenizer=tokenizer,
-    train_batch_size= args.batch_size,
-    meta_batch_size= args.batch_size,
-    last_only=args.prm_loss,
+    train_batch_size= args.train_batch_size,
+    meta_batch_size= args.meta_batch_size,
+    token_based=args.model_type == "token",
     meta_dataset=args.meta_dataset,
+    sanity_check=sanity_check,
 )
 
 
 ### log the configurations to wandb
 
-wandb.init(project="DreamPRM-AIME", mode="online", config=args)
+wandb.init(project="DreamPRM-AIME", mode="offline" if sanity_check else "online", config=args)
 
 device = torch.device(args.device)
-criterion = nn.MSELoss()
+criterion = nn.MSELoss(reduction='none')
 criterion_meta = nn.MSELoss()
+criterion_CE = nn.BCEWithLogitsLoss(reduction='none')
+
 lower_weighted_loss = []
 lower_loss = []
 upper_loss = []
@@ -105,23 +124,32 @@ class Upper(ImplicitProblem):
         return self.module(domain_strings, x)
 
     def training_step(self, batch):
-        labels = batch['labels'].to(device) ## (B, T)
-        correctness = batch['correctness'].to(device) ## (B, )
-        score = self.inner(batch['input_ids'].to(device),
-                                     batch['attention_mask'].to(device),
-                                     labels if not args.prm_loss else None)
+        labels = batch['label'].to(device) ## (B, T)
+        correctness = torch.tensor(batch['correctness'], dtype=torch.float).to(device) ## (B, )
+        score = self.lower(batch['input_ids'].to(device),
+                                     batch['attention_mask'].to(device))
         
         if args.model_type == "token":
-            if args.prm_loss: ### using overall problem solution correctness
+            if args.dreamprm_loss: ### using overall problem solution correctness
                 ### dreamprm loss, score -> (B, T,)
-                score = score[labels!=-100]
-                score = torch.log(score / (1 - score))
-                mean_score = torch.mean(score, dim=1) # (B, )
+                mask = (labels != -100).float()
+                score[labels==-100] = 0
+                score = score / (1 - score)
+                score[labels==-100] = 1
+                score = torch.log(score) # (B, T)
+                score = score* mask # (B, T)
+                mean_score = torch.sum(score, dim=1) / mask.sum(dim=1) # (B, )
                 outputs = torch.sigmoid(mean_score) # (B, )
                 loss = criterion_meta(outputs, correctness)
             else:
                 ### avg cross entropy loss -> per step annotations
-                score, loss = score
+                mask = (labels != -100).float()
+                labels = torch.clamp(labels, min=0).float() # (B, T)
+                
+                loss = criterion_CE(score, labels)
+                loss = loss * mask.float()
+                loss = loss.sum() / mask.sum()
+                
         else:
             ### using overall problem solution correctness
             nproblems = set(batch['index']) # [0, 1, 2, B_Size-1]
@@ -141,7 +169,7 @@ class Upper(ImplicitProblem):
                 
             ## outputs -> (B, )
             ## label -> ## (B * T*(T+1)/2)
-            outputs = torch.stack(outputs, device=device) # (B, )
+            outputs = torch.stack(outputs) # (B, )
             outputs = torch.sigmoid(outputs)
             loss = criterion_meta(outputs, correctness)
                 
@@ -175,19 +203,18 @@ class Upper(ImplicitProblem):
 
 
 class Lower(ImplicitProblem):
-    def forward(self, input_ids, attention_mask, pixel_values, image_grid_thw):
+    def forward(self, input_ids, attention_mask):
         # torch.cuda.empty_cache()
-        return self.module(input_ids, attention_mask, pixel_values, image_grid_thw)
+        return self.module(input_ids, attention_mask)
 
     def training_step(self, batch):
         input_ids = batch['input_ids'].to(device)
         attention_mask = batch['attention_mask'].to(device)
         labels = batch['label'].to(dtype=torch.float).to(device)
-        domain_strings = batch['index']
-        score = self.forward(input_ids=input_ids, attention_mask=attention_mask, labels=labels if not args.prm_loss else None)
-        
+        domain_strings = batch['dataset']
+        score = self.forward(input_ids=input_ids, attention_mask=attention_mask)
         if args.model_type == "token":
-            # if args.prm_loss:
+            # if args.dreamprm_loss:
             # #     ### dreamprm loss, score -> (B, T,)
             # #     score = score[labels!=-100]
             # #     score = torch.log(score / (1 - score))
@@ -196,18 +223,29 @@ class Lower(ImplicitProblem):
             # #     loss = criterion(outputs, labels)
             # else:
             ### avg cross entropy loss
-            score, loss = score
+            mask = (labels != -100).float()
+            labels = torch.clamp(labels, min=0) # (B, T)
+            
+            loss = criterion_CE(score, labels)
+            loss = loss * mask.float()
+            loss = torch.sum(loss, dim=1) / mask.sum(dim=1)  # (B, )
                 
         else:
             # score -> (B, )
+            # labels -> (B, T)
+            ### take last label that is not -100
+            non_filler = (labels != -100).float()
+            index = torch.argmax(non_filler, dim=1)
+            labels = labels[torch.arange(labels.size(0)),index]  # (B, )
             loss = criterion(score, labels)
         
         if args.baseline or args.retrain:
             return loss
 
-        weighted_loss = self.upper(domain_strings, loss)
-        lower_loss.append(loss.item())
-        lower_weighted_loss.append(weighted_loss.item())
+        loss = loss.unsqueeze(1)  # (B, 1)
+        weighted_loss = torch.mean(self.upper(domain_strings, loss))
+        lower_loss.append(torch.mean(loss).item())
+        lower_weighted_loss.append(torch.mean(weighted_loss).item())
         if len(lower_loss) == 100:
             mean_inner_loss = np.mean(lower_loss)
             mean_inner_weighted_loss = np.mean(lower_weighted_loss)
@@ -216,17 +254,44 @@ class Lower(ImplicitProblem):
             lower_loss.clear()
             lower_weighted_loss.clear()
         # torch.cuda.empty_cache()
-
         return weighted_loss
 
     def configure_train_data_loader(self):
         return train_dataloader
 
     def configure_module(self):
+        print("=====Using model type:", args.model_type, "PRM loss:", args.dreamprm_loss)
+
         if args.model_type == "token":
-            return QwenMathTokenClf_RM(device, args.model_path)
+            model = QwenMathTokenClf_RM(device, args.reward_model)
         else:
-            return QwenMathCondGen_RM(device, args.model_path)
+            model = QwenMathCondGen_RM(device, args.reward_model)
+            
+
+        model.to(device)
+        if sanity_check:
+            for param in model.parameters():
+                param.requires_grad = False
+                
+
+            ### freeeze all parameters except last 1 bias paramater:
+            bias_params = [p for n, p in model.named_parameters() if 'bias' in n]         
+            last_bias = bias_params[-1]
+            last_bias.requires_grad = True
+            
+            for name, param in model.named_parameters():
+                if param.requires_grad:
+                    print(f"Trainable parameter: {name}")
+
+            
+            return model
+        
+    
+        return model
+        
+
+
+        
 
     def configure_optimizer(self):
         optimizer = AdamW(
@@ -246,30 +311,41 @@ class Lower(ImplicitProblem):
 class ReweightingEngine(Engine):
     @torch.no_grad()
     def validation(self):
+        torch.save(self.lower.module.state_dict(), f"{args.weights_path}/lower_weights.pt")
+
         torch.save(
-            self.inner.module.LN.state_dict(), f"{args.weights_path}/LN_weights.pt"
-        )
-        self.inner.module.base_model.save_pretrained(f"{args.weights_path}/base_model")
-        torch.save(
-            self.outer.state_dict(),
+            self.upper.state_dict(),
             f"{args.weights_path}/domain_weights.pt",
         )
         
+        #### log this domain weights to wandb # self.raw_weights = nn.Parameter(torch.zeros(self.num_domains))
+        wts = self.upper.module.raw_weights.cpu().numpy()
+        print("Domain Weights:", wts)
+        ### separate line for each domain
+        to_log = {inv_domain_list[i]: wts[i] for i in range(len(domain_list))}
+        wandb.log(to_log)
+            
+
         all_scores = {}
         for ds_name in dataloader_benchmark:
-            for model_name in dataloader_benchmark[ds_name]:
+            for model_name in tqdm(dataloader_benchmark[ds_name]):
+                print(f"Evaluating {ds_name} with {model_name}")
                 test_dataloader = dataloader_benchmark[ds_name][model_name]
                 predictions = None
 
                 for batch in test_dataloader:
-                    score = self.inner(batch['input_ids'].to(device),
+                    score = self.lower(batch['input_ids'].to(device),
                                         batch['attention_mask'].to(device))
-
+                    
                     if args.model_type == "token":
                         # score -> (B, T,)
-                        labels = batch['labels'].to(device)
-                        score = score[labels!=-100]
-                        score = torch.log(score / (1 - score))
+                        labels = batch['label'].to(dtype=torch.float).to(device)
+                        mask = (labels != -100)
+                        score[mask] = 0
+                        score = score / (1 - score)
+                        score[mask] = 1
+                        score = torch.log(score)
+                        score = score * mask.float()  # (B, T)
                         mean_score = torch.mean(score, dim=1)
                         outputs = torch.sigmoid(mean_score) ## (B, )
 
@@ -290,7 +366,7 @@ class ReweightingEngine(Engine):
 
                             outputs.append(mean_score)
 
-                        outputs = torch.stack(outputs, device=device) # (B, )
+                        outputs = torch.stack(outputs) # (B, )
                         outputs = torch.sigmoid(outputs)
 
                     if predictions is None:
@@ -299,17 +375,15 @@ class ReweightingEngine(Engine):
                         predictions = np.concatenate((predictions, outputs.cpu().numpy()), axis=0)
 
                 dataset = test_dataloader.dataset.dataset
-                predictions, score = eval(dataset, predictions)
+                predictions, score = eval(dataset, predictions, ds_name)
 
                 print(f"Dataset: {ds_name}, Model: {model_name}, Score: {score}")
                 df = pd.DataFrame(predictions)
-                df.to_csv(f"{args.weights_path}/{ds_name}_{model_name}_predictions.csv", index=False)
+                df.to_csv(f"{args.weights_path}/{ds_name}_{model_name.split('/')[-1]}_predictions.csv", index=False)
                 wandb.log({f"{ds_name}/{model_name}_score": score})
                 all_scores[f"{ds_name}_{model_name}"] = score
         
-        
-        weights = self.upper.module.raw_weights
-        
+
         all_scores["loss"] = 1
         return all_scores
 
@@ -318,7 +392,7 @@ upper_config = Config(type="darts", precision=args.precision, retain_graph=True)
 lower_config = Config(type="darts", precision=args.precision, unroll_steps=args.unroll_steps, gradient_accumulation=args.gradiant_accumulation)
 engine_config = EngineConfig(
     train_iters=args.iteration_num,
-    valid_step=args.parser.save_every_iterations,
+    valid_step=args.save_every_iterations,
     strategy=args.strategy,
     roll_back=args.rollback,
     logger_type="wandb",

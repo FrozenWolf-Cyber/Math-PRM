@@ -1,1 +1,19 @@
-python main.py --weights_path "weights" --reward_model "Qwen/Qwen2.5-Math-7B-Instruct" --batch_size 4 --prm_loss --model_type "classifier" --meta_dataset "AIME"
+# python main.py --weights_path "weights" --reward_model "Qwen/Qwen2.5-Math-7B-Instruct" --batch_size 4 --prm_loss --model_type "classifier" --meta_dataset "AIME"
+
+## model -> "Qwen/Qwen2.5-Math-7B-Instruct"
+## model_type: token, classifier
+## dreamprm_loss -> with and without for model_type=token
+## meta_dataset: AIME, PRM800K, both
+
+### SANITY CHECK
+export TOKENIZERS_PARALLELISM=false
+python main.py \
+--weights_path "weights" \
+--iteration_num 100000 \
+--unroll_steps 5 \
+--meta_batch_size 1 \
+--train_batch_size 4 \
+--reward_model "Qwen/Qwen2-0.5B" \
+--dreamprm_loss --model_type "classifier" \
+--meta_dataset "AIME" \
+--sanity_check
