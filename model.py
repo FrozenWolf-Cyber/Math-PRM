@@ -64,8 +64,8 @@ class QwenMathTokenClf_RM(nn.Module):
             else:
                 outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
 
-        logits = outputs.logits.to(dtype=torch.float)
-        logits = self.LN(logits)  # Apply linear layer to logits
+        logits = outputs.logits
+        logits = self.LN(logits).to(dtype=torch.float)  # Apply linear layer to logits
         # print(outputs)
         logits = F.softmax(logits)[..., 1]  # Assuming the second class is the one we want to predict
         # print(value_outputs)

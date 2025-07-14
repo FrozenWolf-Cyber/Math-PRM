@@ -21,22 +21,24 @@ subjects_map = {'Algebra':0,
 SEP_TOKEN = '<PRM_STEP_SCORE>'
 
 def chat_template( question, steps):
-        steps = ' <PRM_STEP_SCORE> \n'.join(steps)
+        global SEP_TOKEN
+        steps = f' {SEP_TOKEN} \n'.join(steps)
         
         prompt = f'''Question:
 {question}
 Answer:
-{steps} <PRM_STEP_SCORE>'''
+{steps} {SEP_TOKEN}'''
         
         return prompt
     
 def chat_template_no_special( question, steps):
+        global SEP_TOKEN
         steps = '\n'.join(steps)
         
         prompt = f'''Question:
 {question}
 Answer:
-{steps} <PRM_STEP_SCORE>'''
+{steps} {SEP_TOKEN}'''
         
         return prompt
 
@@ -56,6 +58,12 @@ class QwenMathDataset(Dataset):
         self.special_tokens = special_tokens
         self.inference = inference
         self.has_subjects = has_subjects
+        if SEP_TOKEN == '<PRM_STEP_SCORE>':
+            self.SEP = len(self.tokenizer)-1
+        else:
+            print("Separator token is:", SEP_TOKEN, self.tokenizer(SEP_TOKEN))
+            self.SEP = self.tokenizer(SEP_TOKEN)['input_ids'][0]
+            
     def __len__(self):
         if SANITY_CHECK:
             print("Sanity check mode: returning 10 samples.")
@@ -81,8 +89,8 @@ class QwenMathDataset(Dataset):
         labels = torch.ones_like(model_inputs['input_ids']).long()
 
         if self.special_tokens:
-            labels[(model_inputs['input_ids']!=len(self.tokenizer)-1)] = -100
-            labels[(model_inputs['input_ids']==len(self.tokenizer)-1)] = torch.tensor(raw_labels).long()
+            labels[(model_inputs['input_ids']!=self.SEP)] = -100
+            labels[(model_inputs['input_ids']==self.SEP)] = torch.tensor(raw_labels).long()
         else:
             labels *= -100
             labels[-1] = torch.tensor(raw_labels).long()[-1]

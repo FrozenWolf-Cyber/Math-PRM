@@ -14,9 +14,8 @@ python main.py \
 --meta_batch_size 1 \
 --train_batch_size 4 \
 --reward_model "Qwen/Qwen2-0.5B" \
---dreamprm_loss --model_type "classifier" \
---meta_dataset "AIME" \
---add_new_token \
+--dreamprm_loss --model_type "token" \
+--meta_dataset "PRM800K" \
 --freeze_till_last \
 --freeze_tokens \
 --sanity_check
