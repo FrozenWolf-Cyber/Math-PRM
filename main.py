@@ -52,6 +52,10 @@ parser.add_argument("--dreamprm_loss", action="store_true")
 parser.add_argument("--model_type", type=str, default="token")
 parser.add_argument("--meta_dataset", type=str, default="AIME", help="AIME or PRM800K or both")
 parser.add_argument("--sanity_check", action="store_true")
+parser.add_argument("--add_new_token",  action="store_true", help="Whether to add new token <PRM_STEP_SCORE> to the tokenizer")
+parser.add_argument("--freeze_till_last",  action="store_true", help="Freeze till last layer")
+parser.add_argument("--freeze_tokens",  action="store_true", help="Freeze other than newly added tokens")
+
 
 args = parser.parse_args()
 print(args)
@@ -93,8 +97,9 @@ if sanity_check:
 
 
 tokenizer = AutoTokenizer.from_pretrained(args.reward_model, trust_remote_code=True)
-new_tokens = ['<PRM_STEP_SCORE>']
-num_added_tokens = tokenizer.add_tokens(new_tokens)
+if args.add_new_token:
+    new_tokens = ['<PRM_STEP_SCORE>']
+    num_added_tokens = tokenizer.add_tokens(new_tokens)
 
 
 sampler = None
@@ -110,6 +115,7 @@ resume_labels = None
     train_batch_size= args.train_batch_size,
     meta_batch_size= args.meta_batch_size,
     token_based=args.model_type == "token",
+    add_new_token=args.add_new_token,
     meta_dataset=args.meta_dataset,
     sanity_check=sanity_check,
 )
@@ -280,35 +286,7 @@ class Lower(ImplicitProblem):
         return train_dataloader
 
     def configure_module(self):
-        print("=====Using model type:", args.model_type, "PRM loss:", args.dreamprm_loss)
-
-        if args.model_type == "token":
-            model = QwenMathTokenClf_RM(device, args.reward_model)
-        else:
-            model = QwenMathCondGen_RM(device, args.reward_model)
-            
-
-        model.to(device)
-        if sanity_check:
-            for param in model.parameters():
-                param.requires_grad = False
-                
-
-            ### freeeze all parameters except last 1 bias paramater:
-            bias_params = [p for n, p in model.named_parameters() if 'bias' in n]         
-            last_bias = bias_params[-1]
-            last_bias.requires_grad = True
-            
-            for name, param in model.named_parameters():
-                if param.requires_grad:
-                    print(f"Trainable parameter: {name}")
-
-            
-            return model
-        
-    
-        return model
-        
+        return configure_module(args, device)
 
 
         
@@ -389,6 +367,7 @@ class ReweightingEngine(Engine):
                         outputs = torch.stack(outputs) # (B, )
                         outputs = torch.sigmoid(outputs)
 
+                    outputs = outputs.to(dtype=torch.float32)
                     if predictions is None:
                         predictions = outputs.cpu().numpy()
                     else:

@@ -18,6 +18,7 @@ subjects_map = {'Algebra':0,
  'Precalculus':6,
  'Others':7}
 
+SEP_TOKEN = '<PRM_STEP_SCORE>'
 
 def chat_template( question, steps):
         steps = ' <PRM_STEP_SCORE> \n'.join(steps)
@@ -150,9 +151,16 @@ class QwenMathMetaDataset(Dataset):
     
     
 def build_dataloader(
-        tokenizer, train_batch_size, meta_batch_size, token_based=True, meta_dataset="AIME", # "AIME" or "PRM800K"
+        tokenizer, train_batch_size, meta_batch_size, token_based=True, add_new_token=True, meta_dataset="AIME", # "AIME" or "PRM800K"
         sanity_check=False
 ):
+    
+    if not add_new_token:
+        print(tokenizer.special_tokens_map['additional_special_tokens'])
+        assert '<|im_end|>' in tokenizer.special_tokens_map['additional_special_tokens'], "Please check if <|im_end|> token to the tokenizer vocab."
+        global SEP_TOKEN
+        SEP_TOKEN = '<|im_end|>'
+
     if sanity_check:
         global SANITY_CHECK
         SANITY_CHECK = True

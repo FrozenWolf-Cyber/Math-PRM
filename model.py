@@ -2,7 +2,7 @@ from transformers import Qwen2VLForConditionalGeneration, LlavaOnevisionForCondi
 import torch.nn.functional as F
 import torch
 import torch.nn as nn
-
+DEBUG = True
 # # Define LoRA configuration
 # lora_config = LoraConfig(
 #     r=8,             # Rank for dimensionality reduction (higher = better performance but more compute)
@@ -21,17 +21,20 @@ def get_best_dtype():
 
 
 class QwenMathTokenClf_RM(nn.Module):
-    def __init__(self, device, model_path = "Qwen/Qwen2.5-Math-7B-Instruct"):
+    def __init__(self, device, args):
         super(QwenMathTokenClf_RM, self).__init__()
         self.base_model = AutoModelForTokenClassification.from_pretrained(
-    model_path, 
+    args.reward_model, 
     device_map=device, 
-    torch_dtype=get_best_dtype()
-,
+    torch_dtype=get_best_dtype(),
     trust_remote_code=True,
 )
-        self.model_path = model_path
-        self.add_token()
+        self.base_model.score = nn.Identity()
+        self.args = args
+        self.LN = nn.Linear(self.base_model.config.hidden_size, 2, device=device, dtype=get_best_dtype())
+        self.model_path = args.reward_model
+        if args.add_new_token:
+            self.add_token()
         # model.config.num_labels = 2
         # self.base_model.score = nn.Linear(1536, 2, device=device, dtype=torch.bfloat16)
 
@@ -48,12 +51,21 @@ class QwenMathTokenClf_RM(nn.Module):
         return tokenizer
 
     def forward(self, input_ids, attention_mask, labels=None):
-        if labels is None:
-            outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask)
-        else:
-            outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+        no_grad = self.args.freeze_till_last and (not self.args.add_new_token)
+        
+        with torch.set_grad_enabled(not no_grad):
+            global DEBUG
+            if DEBUG:
+                print("Using no gradient mode:", no_grad)
+                DEBUG = False
+                
+            if labels is None:
+                outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask)
+            else:
+                outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
 
         logits = outputs.logits.to(dtype=torch.float)
+        logits = self.LN(logits)  # Apply linear layer to logits
         # print(outputs)
         logits = F.softmax(logits)[..., 1]  # Assuming the second class is the one we want to predict
         # print(value_outputs)
@@ -62,20 +74,22 @@ class QwenMathTokenClf_RM(nn.Module):
         
         
 class QwenMathCondGen_RM(nn.Module):
-    def __init__(self, device, model_path="Qwen/Qwen2.5-Math-7B-Instruct"):
+    def __init__(self, device, args):
         super(QwenMathCondGen_RM, self).__init__()
         self.base_model = AutoModelForCausalLM.from_pretrained(
-    model_path, 
+    args.reward_model, 
     device_map=device, 
     torch_dtype=get_best_dtype(),
     trust_remote_code=True,
 )
-        self.model_path = model_path
+        self.model_path = args.reward_model
+        self.args = args
         # self.lora_model = get_peft_model(base_model, lora_config)
         ### get dtype and set to linear layer
         dtype = self.base_model.dtype
         print(f"Model dtype: {dtype}")
-        self.add_token()
+        if args.add_new_token:
+            self.add_token()
         self.LN = nn.Linear(self.base_model.config.vocab_size, 1, device=device, dtype=dtype)
         self.sigmoid = nn.Sigmoid()
         
@@ -92,13 +106,61 @@ class QwenMathCondGen_RM(nn.Module):
         return tokenizer
 
     def forward(self, input_ids, attention_mask, labels=None):
-        outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask)
+        no_grad = self.args.freeze_till_last and (not self.args.add_new_token)
+        
+        with torch.set_grad_enabled(not no_grad):
+            global DEBUG
+            if DEBUG:
+                print("Using no gradient mode:", no_grad)
+                DEBUG = False
+   
+            outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask)
+            
         outputs = outputs.logits[:, -1, :]
         # print(outputs)
         value_outputs = self.LN(outputs)
         value_outputs = self.sigmoid(value_outputs)
         # print(value_outputs)
         return value_outputs.squeeze(dim=1)
+    
+def configure_module(args, device):
+    if args.model_type == "token":
+        model = QwenMathTokenClf_RM(device, args)
+    else:
+        model = QwenMathCondGen_RM(device, args)
+    if args.freeze_till_last:
+        for param in model.base_model.parameters():
+            param.requires_grad = False
+        model.LN.requires_grad = True
+        if args.add_new_token:
+            print("Unfreezing newly addded token")
+            model.base_model.model.embed_tokens.weight[-1].requires_grad = True
+            
+        
+    if args.freeze_tokens:
+        print("Freezing all embeddings")
+        model.base_model.model.embed_tokens.requires_grad = False
+        if args.add_new_token:
+            print("Freezing all embeddings except the newly added token")
+            model.base_model.model.embed_tokens.weight[-1].requires_grad = True
+            
+        
+        
+    model.to(device)
+    if args.sanity_check:
+        for param in model.parameters():
+            param.requires_grad = False
+            
+        ### freeeze all parameters except last 1 bias paramater:
+        bias_params = [p for n, p in model.named_parameters() if 'bias' in n]         
+        last_bias = bias_params[-1]
+        last_bias.requires_grad = True
+        
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                print(f"Trainable parameter: {name}")
+    return model
+    
 
 class DomainTable(nn.Module):
     def __init__(self, domain_to_idx):

@@ -16,4 +16,7 @@ python main.py \
 --reward_model "Qwen/Qwen2-0.5B" \
 --dreamprm_loss --model_type "classifier" \
 --meta_dataset "AIME" \
+--add_new_token \
+--freeze_till_last \
+--freeze_tokens \
 --sanity_check
