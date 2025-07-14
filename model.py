@@ -159,6 +159,14 @@ def configure_module(args, device):
         for name, param in model.named_parameters():
             if param.requires_grad:
                 print(f"Trainable parameter: {name}")
+                
+    ### Trainable parameters using numel out of total parameters
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    total_params = sum(p.numel() for p in model.parameters())
+    print("-----"*10)
+    print(f"Trainable parameters: {trainable_params} out of {total_params} total parameters.")
+    print("-----"*10)
+                
     return model
     
 
