@@ -151,6 +151,7 @@ class Upper(ImplicitProblem):
 
     def training_step(self, batch):
         labels = batch['label'].to(device) ## (B, T)
+        print(labels.shape, batch['input_ids'].shape, batch['correctness'])
         correctness = torch.tensor(batch['correctness'], dtype=torch.float).to(device) ## (B, )
         score = self.lower(batch['input_ids'].to(device),
                                      batch['attention_mask'].to(device))
