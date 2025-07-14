@@ -196,7 +196,7 @@ class Upper(ImplicitProblem):
                 
             ## outputs -> (B, )
             ## label -> ## (B * T*(T+1)/2)
-            print("upper",[len(i) for i in outputs])
+            print("upper",outputs, correctness)
             outputs = torch.stack(outputs) # (B, )
             outputs = torch.sigmoid(outputs)
             loss = criterion_meta(outputs, correctness)
