@@ -73,8 +73,8 @@ def get_best_dtype():
 if get_best_dtype() == torch.bfloat16:
     print("Using bfloat16 precision")
 else:
-    args.precision = "fp16"
-    print("Using fp16 precision")
+    args.precision = "fp32"
+    print("Using fp32 precision")
 
 inv_domain_list = {v: k for k, v in domain_list.items()}
 
@@ -118,6 +118,14 @@ resume_labels = None
 ### log the configurations to wandb
 
 wandb.init(project="DreamPRM-AIME", mode="offline" if sanity_check else "online", config=args)
+
+if not sanity_check:
+    run_name = wandb.run.name
+    print(f"Run name: {run_name}")
+    ### edit the save path to include the run name
+    args.weights_path = os.path.join(args.weights_path, run_name)
+    if not os.path.exists(args.weights_path):
+        os.makedirs(args.weights_path)
 
 device = torch.device(args.device)
 criterion = nn.MSELoss(reduction='none')

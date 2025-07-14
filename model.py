@@ -17,7 +17,7 @@ def get_best_dtype():
     capability = torch.cuda.get_device_capability()
     # Ampere and above (sm_80, 8.0) supports bfloat16
     supports_bfloat16 = capability >= (8, 0)
-    return torch.bfloat16 if supports_bfloat16 else torch.float16
+    return torch.bfloat16 if supports_bfloat16 else torch.float32
 
 
 class QwenMathTokenClf_RM(nn.Module):
