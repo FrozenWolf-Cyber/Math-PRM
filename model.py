@@ -13,6 +13,12 @@ import torch.nn as nn
 # )
 
 
+def get_best_dtype():
+    capability = torch.cuda.get_device_capability()
+    # Ampere and above (sm_80, 8.0) supports bfloat16
+    supports_bfloat16 = capability >= (8, 0)
+    return torch.bfloat16 if supports_bfloat16 else torch.float16
+
 
 class QwenMathTokenClf_RM(nn.Module):
     def __init__(self, device, model_path = "Qwen/Qwen2.5-Math-7B-Instruct"):
@@ -20,7 +26,8 @@ class QwenMathTokenClf_RM(nn.Module):
         self.base_model = AutoModelForTokenClassification.from_pretrained(
     model_path, 
     device_map=device, 
-    torch_dtype=torch.bfloat16,
+    torch_dtype=get_best_dtype()
+,
     trust_remote_code=True,
 )
         self.model_path = model_path
@@ -60,7 +67,7 @@ class QwenMathCondGen_RM(nn.Module):
         self.base_model = AutoModelForCausalLM.from_pretrained(
     model_path, 
     device_map=device, 
-    torch_dtype=torch.bfloat16,
+    torch_dtype=get_best_dtype(),
     trust_remote_code=True,
 )
         self.model_path = model_path
