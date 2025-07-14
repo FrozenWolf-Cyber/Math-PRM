@@ -151,7 +151,7 @@ class Upper(ImplicitProblem):
 
     def training_step(self, batch):
         labels = batch['label'].to(device) ## (B, T)
-        print(labels.shape, batch['input_ids'].shape, batch['correctness'])
+        # print("upper",labels.shape, batch['input_ids'].shape, batch['correctness'])
         correctness = torch.tensor(batch['correctness'], dtype=torch.float).to(device) ## (B, )
         score = self.lower(batch['input_ids'].to(device),
                                      batch['attention_mask'].to(device))
@@ -179,7 +179,6 @@ class Upper(ImplicitProblem):
                 
         else:
             ### using overall problem solution correctness
-            print(batch['index'])
             nproblems = set(batch['index']) # [0, 1, 2, B_Size-1]
             # score -> (B * T*(T+1)/2) So [A_0_1, A_0_2,.. B_0_1, B_0_2,...] in cummulative order
             score = torch.log(score / (1 - score))
@@ -197,7 +196,6 @@ class Upper(ImplicitProblem):
                 
             ## outputs -> (B, )
             ## label -> ## (B * T*(T+1)/2)
-            print("upper",outputs, correctness)
             outputs = torch.stack(outputs) # (B, )
             outputs = torch.sigmoid(outputs)
             loss = criterion_meta(outputs, correctness)
@@ -242,6 +240,7 @@ class Lower(ImplicitProblem):
         labels = batch['label'].to(dtype=torch.float).to(device)
         domain_strings = batch['dataset']
         score = self.forward(input_ids=input_ids, attention_mask=attention_mask)
+        # print("lower",score.shape, labels.shape, batch['correctness'])
         if args.model_type == "token":
             # if args.dreamprm_loss:
             # #     ### dreamprm loss, score -> (B, T,)
@@ -267,7 +266,6 @@ class Lower(ImplicitProblem):
             index = torch.argmax(non_filler, dim=1)
             labels = labels[torch.arange(labels.size(0)),index]  # (B, )
             loss = criterion(score, labels)
-            print("lower",score.shape, labels.shape, index.shape)
         
         if args.baseline or args.retrain:
             return loss
