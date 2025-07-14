@@ -1,7 +1,7 @@
 betty-ml
 datasets
 huggingface-hub
-transformers
+transformers==4.46.3
 wandb
 sympy
 word2number

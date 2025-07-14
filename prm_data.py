@@ -197,7 +197,8 @@ def build_dataloader(
     
     train_dataset = QwenMathDataset(data['train'], tokenizer, special_tokens=token_based)
 
-    meta_dataset = None
+    assert meta_dataset in ["AIME", "PRM800K", "both"], "Meta dataset must be specified as 'AIME', 'PRM800K', or 'both'."
+
     if meta_dataset == "AIME":
         meta_dataset = load_dataset("FrozenWolf/Gemini-AIME-Meta")['train']
     elif meta_dataset == "PRM800K":
@@ -207,7 +208,6 @@ def build_dataloader(
         meta_dataset2 = data['test']
         meta_dataset = ConcatDataset([meta_dataset1, meta_dataset2])
     
-    assert meta_dataset is not None, "Meta dataset must be specified as 'AIME', 'PRM800K', or 'both'."
     
     if not token_based:
         meta_dataset = QwenMathMetaDataset(meta_dataset, tokenizer)
