@@ -20,3 +20,4 @@ python main.py \
 --freeze_till_last \
 --freeze_tokens \
 --sanity_check
+

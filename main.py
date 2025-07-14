@@ -178,6 +178,7 @@ class Upper(ImplicitProblem):
                 
         else:
             ### using overall problem solution correctness
+            print(batch['index'])
             nproblems = set(batch['index']) # [0, 1, 2, B_Size-1]
             # score -> (B * T*(T+1)/2) So [A_0_1, A_0_2,.. B_0_1, B_0_2,...] in cummulative order
             score = torch.log(score / (1 - score))
@@ -195,6 +196,7 @@ class Upper(ImplicitProblem):
                 
             ## outputs -> (B, )
             ## label -> ## (B * T*(T+1)/2)
+            print("upper",[len(i) for i in outputs])
             outputs = torch.stack(outputs) # (B, )
             outputs = torch.sigmoid(outputs)
             loss = criterion_meta(outputs, correctness)
@@ -264,6 +266,7 @@ class Lower(ImplicitProblem):
             index = torch.argmax(non_filler, dim=1)
             labels = labels[torch.arange(labels.size(0)),index]  # (B, )
             loss = criterion(score, labels)
+            print("lower",score.shape, labels.shape, index.shape)
         
         if args.baseline or args.retrain:
             return loss
