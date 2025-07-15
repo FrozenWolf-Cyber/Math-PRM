@@ -218,6 +218,13 @@ class QwenMathMetaDataset(Dataset):
         self.len = 0
 
         df = self.dataset.to_pandas()
+        if filter_dataset_steps > 0:
+            print(f"Filtering dataset to steps <= {filter_dataset_steps}")
+            data = data[data['completions'].apply(lambda x: len(x) <= filter_dataset_steps)]
+            data = data.drop(columns=['__index_level_0__'])
+            df = data
+            self.dataset = HF_Dataset.from_pandas(data)
+        
 
         # Count total words in the completions list
         df['total_word_count'] = df['completions'].progress_apply(lambda steps: sum(len(tokenizer(step)['input_ids']) for step in steps))
