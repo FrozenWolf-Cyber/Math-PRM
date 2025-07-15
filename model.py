@@ -150,7 +150,7 @@ def configure_module(args, device):
         
         
     model.to(device)
-    if args.sanity_check:
+    if args.freeze_all_but_bias:
         for param in model.parameters():
             param.requires_grad = False
             

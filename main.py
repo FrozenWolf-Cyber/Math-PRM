@@ -51,6 +51,7 @@ parser.add_argument("--max_step_size", type=int, default=-1)
 parser.add_argument("--max_meta_steps_grad", type=int, default=-1)
 parser.add_argument("--filter_dataset_steps", type=int, default=20, help="Max number of steps to filter dataset")
 parser.add_argument("--wandb_mode", type=str, default="online", help="wandb mode")
+parser.add_argument("--freeze_all_but_bias", action="store_true")
 
 args = parser.parse_args()
 print(args)

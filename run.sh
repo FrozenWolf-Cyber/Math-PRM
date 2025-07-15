@@ -17,5 +17,6 @@ python main.py \
 --model_type "classifier" \
 --meta_dataset "both" \
 --wandb_mode "offline" \
+--freeze_all_but_bias \
 --max_step_size 1 --max_meta_steps_grad 10 --filter_dataset_steps 20 --sanity_check 
 
