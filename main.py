@@ -14,11 +14,12 @@ import numpy as np
 from copy import deepcopy
 import pandas as pd
 from eval_aime import *
+import gc
  
 parser = argparse.ArgumentParser(description="DreamPRM")
 parser.add_argument('--weights_path', type=str)
 parser.add_argument("--iteration_num", type=int, default=10000)
-parser.add_argument("--save_every_iterations", type=int, default=1000)
+parser.add_argument("--save_every_iterations", type=int, default=5000)
 parser.add_argument("--unroll_steps", type=int, default=5)
 parser.add_argument("--gradiant_accumulation", type=int, default=1)
 parser.add_argument("--device", type=str, default="cuda")
@@ -28,26 +29,17 @@ parser.add_argument("--rollback", action="store_true")
 parser.add_argument("--baseline", action="store_true")
 parser.add_argument("--retrain", action="store_true")
 parser.add_argument("--seed", type=int, default=1)
-parser.add_argument("--local_rank", type=int, default=0)
 parser.add_argument("--lr", type=float, default=5e-7)
 parser.add_argument("--momentum", type=float, default=0.9)
 parser.add_argument("--scheduler_step_size", type=int, default=5000)
 parser.add_argument("--scheduler_gamma", type=float, default=0.5)
-parser.add_argument("--dampening", type=float, default=0.0)
-parser.add_argument("--nesterov", type=bool, default=False)
 parser.add_argument("--weight_decay", type=float, default=1e-3)
 parser.add_argument("--meta_lr", type=float, default=0.01)
-parser.add_argument("--meta_weight_decay", type=float, default=0.0)
 parser.add_argument("--reward_model", type=str, default="Qwen/Qwen2.5-Math-7B-Instruct")
-parser.add_argument("--num_meta", type=int, default=1000)
-parser.add_argument("--imbalanced_factor", type=int, default=None)
-parser.add_argument("--corruption_type", type=str, default=None)
-parser.add_argument("--corruption_ratio", type=float, default=0.0)
 parser.add_argument("--train_batch_size", type=int, default=4)
 parser.add_argument("--meta_batch_size", type=int, default=1)
-parser.add_argument("--max_epoch", type=int, default=120)
-parser.add_argument("--meta_interval", type=int, default=1)
-parser.add_argument("--paint_interval", type=int, default=20)
+
+
 parser.add_argument("--dreamprm_loss", action="store_true")
 parser.add_argument("--model_type", type=str, default="token")
 parser.add_argument("--meta_dataset", type=str, default="AIME", help="AIME or PRM800K or both")
@@ -55,7 +47,10 @@ parser.add_argument("--sanity_check", action="store_true")
 parser.add_argument("--add_new_token",  action="store_true", help="Whether to add new token <PRM_STEP_SCORE> to the tokenizer")
 parser.add_argument("--freeze_till_last",  action="store_true", help="Freeze till last layer")
 parser.add_argument("--freeze_tokens",  action="store_true", help="Freeze other than newly added tokens")
-
+parser.add_argument("--max_step_size", type=int, default=-1)
+parser.add_argument("--max_meta_steps_grad", type=int, default=-1)
+parser.add_argument("--filter_dataset_steps", type=int, default=20, help="Max number of steps to filter dataset")
+parser.add_argument("--wandb_mode", type=str, default="online", help="wandb mode")
 
 args = parser.parse_args()
 print(args)
@@ -91,9 +86,10 @@ if not os.path.exists(args.weights_path):
     os.makedirs(args.weights_path)
 
 if sanity_check:
-    args.save_every_iterations = 2
-    args.iteration_num = 5
-    args.max_epoch = 2
+    args.save_every_iterations = 10
+    args.iteration_num = 15
+    if args.wandb_mode == "online":
+        args.wandb_mode = "offline"
 
 
 tokenizer = AutoTokenizer.from_pretrained(args.reward_model, trust_remote_code=True)
@@ -118,6 +114,7 @@ resume_labels = None
     add_new_token=args.add_new_token,
     meta_dataset=args.meta_dataset,
     sanity_check=sanity_check,
+    filter_dataset_steps=args.filter_dataset_steps,
 )
 
 
@@ -151,10 +148,35 @@ class Upper(ImplicitProblem):
 
     def training_step(self, batch):
         labels = batch['label'].to(device) ## (B, T)
-        # print("upper",labels.shape, batch['input_ids'].shape, batch['correctness'])
+        print("upper",labels.shape, batch['input_ids'].shape, batch['correctness'])
         correctness = torch.tensor(batch['correctness'], dtype=torch.float).to(device) ## (B, )
-        score = self.lower(batch['input_ids'].to(device),
-                                     batch['attention_mask'].to(device))
+
+        max_meta_steps_grad = args.max_meta_steps_grad
+        if args.max_step_size == -1:
+            max_step_size = len(batch['input_ids'])
+        else:
+            max_step_size = args.max_step_size
+            
+        ### the last max_meta_steps_grad samples alone needs to be performaed with grad, rest without grad
+        score_nograd = None
+        if max_meta_steps_grad != -1 :
+            with torch.set_grad_enabled(False):
+                if len(batch['input_ids']) > max_meta_steps_grad:
+                    score_nograd = unbatch_process(batch, device, self.lower, max_step_size, no_grad=True, start=0, end=len(batch['input_ids'])-max_meta_steps_grad)
+                    print("score_nograd shape:", score_nograd.shape)
+            with torch.set_grad_enabled(True):
+                score = unbatch_process(batch, device, self.lower, max_step_size, no_grad=False, start=max(0,len(batch['input_ids'])-max_meta_steps_grad), end=len(batch['input_ids']))
+            
+            print( "score_grad shape:", score.shape)
+            if score_nograd is not None:
+                score = torch.cat((score_nograd, score), dim=0)
+        
+        else:
+            score = unbatch_process(batch, device, self.lower, max_step_size)
+              
+        # print("Device:", score.device)
+        print("upper score shape:", score.shape)
+
         
         if args.model_type == "token":
             if args.dreamprm_loss: ### using overall problem solution correctness
@@ -178,6 +200,7 @@ class Upper(ImplicitProblem):
                 loss = loss.sum() / mask.sum()
                 
         else:
+            # print("batch['index']:", batch['index'], score.device)
             ### using overall problem solution correctness
             nproblems = set(batch['index']) # [0, 1, 2, B_Size-1]
             # score -> (B * T*(T+1)/2) So [A_0_1, A_0_2,.. B_0_1, B_0_2,...] in cummulative order
@@ -191,7 +214,6 @@ class Upper(ImplicitProblem):
                         mean_score += score[j]
                         step += 1
                 mean_score /= step
-                
                 outputs.append(mean_score)
                 
             ## outputs -> (B, )
@@ -200,7 +222,7 @@ class Upper(ImplicitProblem):
             outputs = torch.sigmoid(outputs)
             loss = criterion_meta(outputs, correctness)
                 
-        
+        print("upper loss shape:", loss.shape)
         upper_loss.append(loss.item())
 
         # torch.cuda.empty_cache()
@@ -230,16 +252,21 @@ class Upper(ImplicitProblem):
 
 
 class Lower(ImplicitProblem):
-    def forward(self, input_ids, attention_mask):
+    def forward(self, input_ids, attention_mask, no_grad=False):
         # torch.cuda.empty_cache()
-        return self.module(input_ids, attention_mask)
+        return self.module(input_ids, attention_mask, no_grad=no_grad)
 
     def training_step(self, batch):
         input_ids = batch['input_ids'].to(device)
         attention_mask = batch['attention_mask'].to(device)
         labels = batch['label'].to(dtype=torch.float).to(device)
         domain_strings = batch['dataset']
+        print("lower", input_ids.shape, attention_mask.shape, labels.shape, batch['correctness'])
         score = self.forward(input_ids=input_ids, attention_mask=attention_mask)
+        print("lower score shape:", score.shape)
+        del input_ids, attention_mask
+        gc.collect()
+        torch.cuda.empty_cache()
         # print("lower",score.shape, labels.shape, batch['correctness'])
         if args.model_type == "token":
             # if args.dreamprm_loss:
@@ -257,20 +284,35 @@ class Lower(ImplicitProblem):
             loss = criterion_CE(score, labels)
             loss = loss * mask.float()
             loss = torch.sum(loss, dim=1) / mask.sum(dim=1)  # (B, )
+            del mask, labels
                 
         else:
             # score -> (B, )
             # labels -> (B, T)
             ### take last label that is not -100
-            non_filler = (labels != -100).float()
-            index = torch.argmax(non_filler, dim=1)
+            # labels: (B, T)
+            non_filler = (labels != -100)  # (B, T), bool
+            # flip along the time dimension
+            reversed_non_filler = non_filler.flip(dims=[1])  # (B, T)
+            # find index of the last non-(-100) (which is first True in the reversed tensor)
+            reversed_index = torch.argmax(reversed_non_filler.float(), dim=1)  # (B,)
+            # convert to correct index from the start
+            index = labels.size(1) - 1 - reversed_index  # (B,)
             labels = labels[torch.arange(labels.size(0)),index]  # (B, )
+            # print("tokenclf,lower",labels, index)
             loss = criterion(score, labels)
+            
+            del non_filler, reversed_non_filler, reversed_index, index
+        
+        print("lower loss shape:", loss.shape)
+        torch.cuda.empty_cache()
+        gc.collect()
         
         if args.baseline or args.retrain:
             return loss
 
         loss = loss.unsqueeze(1)  # (B, 1)
+        # print("lower loss",loss)
         weighted_loss = torch.mean(self.upper(domain_strings, loss))
         lower_loss.append(torch.mean(loss).item())
         lower_weighted_loss.append(torch.mean(weighted_loss).item())
@@ -319,7 +361,11 @@ class ReweightingEngine(Engine):
         )
         
         #### log this domain weights to wandb # self.raw_weights = nn.Parameter(torch.zeros(self.num_domains))
-        wts = self.upper.module.raw_weights.cpu().numpy()
+        wts = self.upper.module.raw_weights
+        positive_weights = torch.nn.functional.softplus(wts)
+        mean_weights = positive_weights.mean()
+        wts = (positive_weights / mean_weights).cpu().numpy()
+        
         print("Domain Weights:", wts)
         ### separate line for each domain
         to_log = {inv_domain_list[i]: wts[i] for i in range(len(domain_list))}
@@ -334,8 +380,13 @@ class ReweightingEngine(Engine):
                 predictions = None
 
                 for batch in test_dataloader:
-                    score = self.lower(batch['input_ids'].to(device),
-                                        batch['attention_mask'].to(device))
+                    if args.max_step_size == -1:
+                        max_step_size = len(batch['input_ids'])
+                    else:
+                        max_step_size = args.max_step_size
+                    print("validation: batch['input_ids'].shape:", batch['input_ids'].shape)
+                    score = unbatch_process(batch, device, self.lower, max_step_size, no_grad=True).cpu()
+                    print("validation: score.shape:", score.shape)
                     
                     if args.model_type == "token":
                         # score -> (B, T,)
@@ -371,9 +422,9 @@ class ReweightingEngine(Engine):
 
                     outputs = outputs.to(dtype=torch.float32)
                     if predictions is None:
-                        predictions = outputs.cpu().numpy()
+                        predictions = outputs.numpy()
                     else:
-                        predictions = np.concatenate((predictions, outputs.cpu().numpy()), axis=0)
+                        predictions = np.concatenate((predictions, outputs.numpy()), axis=0)
 
                 dataset = test_dataloader.dataset.dataset
                 predictions, score = eval(dataset, predictions, ds_name)

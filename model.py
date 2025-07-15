@@ -2,6 +2,7 @@ from transformers import Qwen2VLForConditionalGeneration, LlavaOnevisionForCondi
 import torch.nn.functional as F
 import torch
 import torch.nn as nn
+import gc
 DEBUG = True
 # # Define LoRA configuration
 # lora_config = LoraConfig(
@@ -50,8 +51,9 @@ class QwenMathTokenClf_RM(nn.Module):
             
         return tokenizer
 
-    def forward(self, input_ids, attention_mask, labels=None):
-        no_grad = self.args.freeze_till_last and (not self.args.add_new_token)
+    def forward(self, input_ids, attention_mask, labels=None, no_grad=False):
+        if not no_grad:
+            no_grad = self.args.freeze_till_last and (not self.args.add_new_token)
         
         with torch.set_grad_enabled(not no_grad):
             global DEBUG
@@ -105,8 +107,9 @@ class QwenMathCondGen_RM(nn.Module):
             
         return tokenizer
 
-    def forward(self, input_ids, attention_mask, labels=None):
-        no_grad = self.args.freeze_till_last and (not self.args.add_new_token)
+    def forward(self, input_ids, attention_mask, labels=None, no_grad=False):
+        if not no_grad:
+            no_grad = self.args.freeze_till_last and (not self.args.add_new_token)
         
         with torch.set_grad_enabled(not no_grad):
             global DEBUG
@@ -169,6 +172,26 @@ def configure_module(args, device):
                 
     return model
     
+    
+def unbatch_process(batch, device, model, max_step_size, no_grad=False, start=None, end=None):
+    if start is None:
+        start = 0
+    if end is None:
+        end = len(batch['input_ids'])
+    
+    score_list = []
+    for idx in range(start, end, max_step_size):
+        input_ids = batch['input_ids'][idx:min(end, idx + max_step_size)].to(device)
+        attn_mask = batch['attention_mask'][idx:min(end,idx + max_step_size)].to(device)
+        score = model(input_ids.to(device),
+                        attn_mask.to(device), no_grad=no_grad)
+        
+        score_list.append(score)
+        del input_ids, attn_mask
+        gc.collect()
+        torch.cuda.empty_cache()
+    score = torch.cat(score_list, dim=0)
+    return score
 
 class DomainTable(nn.Module):
     def __init__(self, domain_to_idx):
@@ -182,7 +205,7 @@ class DomainTable(nn.Module):
         self.num_domains = len(domain_to_idx)
 
         # Create learnable raw weights (initialized to zero)
-        self.raw_weights = nn.Parameter(torch.zeros(self.num_domains))
+        self.raw_weights = nn.Parameter(torch.ones(self.num_domains))
 
     def forward(self, domain_strings, x):
         """
