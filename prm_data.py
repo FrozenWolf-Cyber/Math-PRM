@@ -222,7 +222,7 @@ class QwenMathMetaDataset(Dataset):
         if filter_dataset_steps > 0:
             data = df
             print(f"Filtering dataset to steps <= {filter_dataset_steps}")
-            data = data[data['completions'].apply(lambda x: len(x) <= filter_dataset_steps)]
+            data = data[data['completions'].apply(lambda x: len(x) <= filter_dataset_steps)].reset_index(drop=True)
             df = data
             self.dataset = HF_Dataset.from_pandas(data)
         
@@ -240,7 +240,7 @@ class QwenMathMetaDataset(Dataset):
         # Set final self.len
         self.len = len(df)
                 
-        print(f"Sanity check mode:  max len idx = {self.size_map[max_len_idx]}")
+        print(f"Sanity check mode:  max len idx = {self.size_map[max_len_idx]} at {max_len_idx}")
         print(f"Total number of samples: {self.len}")
         self.index_map[0], self.index_map[max_len_idx] = self.index_map[max_len_idx], self.index_map[0]
         
@@ -250,7 +250,7 @@ class QwenMathMetaDataset(Dataset):
         if SANITY_CHECK:
             print("Sanity check mode: returning 10 samples.")
             return 10
-        return len(self.index_map)
+        return self.len
 
     def __getitem__(self, idx):
         idx = self.index_map[idx]
