@@ -222,7 +222,6 @@ class QwenMathMetaDataset(Dataset):
             data = df
             print(f"Filtering dataset to steps <= {filter_dataset_steps}")
             data = data[data['completions'].apply(lambda x: len(x) <= filter_dataset_steps)]
-            data = data.drop(columns=['__index_level_0__'])
             df = data
             self.dataset = HF_Dataset.from_pandas(data)
         
