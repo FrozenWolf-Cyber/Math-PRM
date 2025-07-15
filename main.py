@@ -469,5 +469,4 @@ dependencies = {"l2u": l2u, "u2l": u2l}
 engine = ReweightingEngine(
     config=engine_config, problems=problems, dependencies=dependencies
 )
-engine.device = device
 engine.run()
