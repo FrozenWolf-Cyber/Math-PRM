@@ -56,17 +56,18 @@ class QwenMathDataset(Dataset):
     [A, B, C] -> [T, F, T]
     special_tokens -> True for Token based model
     '''
-    def __init__(self, data, tokenizer, special_tokens=True, inference=False, has_subjects=True, filter_dataset_steps=-1):
+    def __init__(self, data, tokenizer, special_tokens=True, inference=False, has_subjects=True, filter_dataset_steps=-1, filter_dataset_token_size=-1):
         self.dataset = data
         self.tokenizer = tokenizer
         self.special_tokens = special_tokens
         self.inference = inference
         self.has_subjects = has_subjects
         
+        print(f"Dataset loaded with {len(self.dataset)} samples.")
         if filter_dataset_steps > 0:
             print(f"Filtering dataset to steps <= {filter_dataset_steps}")
             data = data.to_pandas()
-            data = data[data['completions'].apply(lambda x: len(x) <= filter_dataset_steps)]
+            data = data[data['completions'].apply(lambda x: len(x) <= filter_dataset_steps)].reset_index(drop=True)
             data = data.drop(columns=['__index_level_0__'])
             self.dataset = HF_Dataset.from_pandas(data)
         
@@ -76,69 +77,76 @@ class QwenMathDataset(Dataset):
             print("Separator token is:", SEP_TOKEN, self.tokenizer(SEP_TOKEN))
             self.SEP = self.tokenizer(SEP_TOKEN)['input_ids'][0]
             
+        print("dataset size after step filter:", len(self.dataset))
+
+        if filter_dataset_token_size>0:
+            data = self.dataset.to_pandas()
+            if os.path.exists(f"pre_{len(data)}_qwen_math_dataset.pkl"):
+                print(f"Loading preprocessed dataset from pre_{len(data)}_qwen_math_dataset.pkl")
+                with open(f"pre_{len(data)}_qwen_math_dataset.pkl", "rb") as f:
+                    data = pickle.load(f)
+                    assert len(data) == len(self.dataset), "Preprocessed dataset length mismatch."
+            else:
+                data['total_word_count'] = data['completions'].progress_apply(lambda steps: sum(len(tokenizer(step)['input_ids']) for step in steps))
+                pickle.dump(data, open(f"pre_{len(data)}_qwen_math_dataset.pkl", "wb"))
+                
+            print(f"Filtering dataset to token size <= {filter_dataset_token_size}")
+            data = data[data['total_word_count'] <= filter_dataset_token_size].reset_index(drop=True)
+            print(f"Filtered dataset size: {len(data)}")
+            self.dataset = HF_Dataset.from_pandas(data)
+
+        rows = []
+        for i, sample in enumerate(tqdm(self.dataset)):
+            for j, step in enumerate(sample['completions']):
+                rows.append({
+                    'dataset_idx': i,
+                    'completion_idx': j,
+                    'completion_text': step
+                })
+        df = pd.DataFrame(rows)
+        # Group by dataset_idx and compute cumulative token length
         
-        if not self.special_tokens:
-
-            rows = []
-            for i, sample in enumerate(tqdm(self.dataset)):
-                for j, step in enumerate(sample['completions']):
-                    rows.append({
-                        'dataset_idx': i,
-                        'completion_idx': j,
-                        'completion_text': step
-                    })
-
-            df = pd.DataFrame(rows)
-
-            # Group by dataset_idx and compute cumulative token length
-            import pickle
-            if len(df) > 1000000:
-                if os.path.exists(f"{len(df)}_qwen_math_dataset.pkl"):
-                    print(f"Loading preprocessed dataset from {len(df)}_qwen_math_dataset.pkl")
-                    with open(f"{len(df)}_qwen_math_dataset.pkl", "rb") as f:
-                        df1 = pickle.load(f)
-                        assert len(df1) == len(df), "Preprocessed dataset length mismatch."
-                        df = df1
-                else:
-                    df['token_count'] = df['completion_text'].progress_apply(lambda x: len(tokenizer(x)['input_ids']))
-                    pickle.dump(df, open(f"{len(df)}_qwen_math_dataset.pkl", "wb"))
+        if len(df) > 1000000:
+            if os.path.exists(f"{len(df)}_qwen_math_dataset.pkl"):
+                print(f"Loading preprocessed dataset from {len(df)}_qwen_math_dataset.pkl")
+                with open(f"{len(df)}_qwen_math_dataset.pkl", "rb") as f:
+                    df1 = pickle.load(f)
+                    assert len(df1) == len(df), "Preprocessed dataset length mismatch."
+                    df = df1
             else:
                 df['token_count'] = df['completion_text'].progress_apply(lambda x: len(tokenizer(x)['input_ids']))
+                pickle.dump(df, open(f"{len(df)}_qwen_math_dataset.pkl", "wb"))
+        else:
+            df['token_count'] = df['completion_text'].progress_apply(lambda x: len(tokenizer(x)['input_ids']))
+            
+        df['step_count'] = 1
+        df['cumulative_tokens'] = df.groupby('dataset_idx')['token_count'].cumsum()
+        df['cumulative_steps'] = df.groupby('dataset_idx')['step_count'].cumsum()
+        
+        
+        # Build index and size maps
+        self.index_map = {}
+        self.size_map = {}
+        self.len = 0
+        max_len = -1
+        max_steps = -1
+        max_len_idx = -1
+        max_steps_idx = -1
+        for row in df.itertuples():
+            self.index_map[self.len] = (row.dataset_idx, row.completion_idx)
+            self.size_map[self.len] = [row.cumulative_steps, row.cumulative_tokens]
+            if row.cumulative_steps > max_steps:
+                max_steps = row.cumulative_steps
+                max_steps_idx = self.len
+            if row.cumulative_tokens > max_len:
+                max_len = row.cumulative_tokens
+                max_len_idx = self.len
+            self.len += 1
                 
-            df['step_count'] = 1
-            df['cumulative_tokens'] = df.groupby('dataset_idx')['token_count'].cumsum()
-            df['cumulative_steps'] = df.groupby('dataset_idx')['step_count'].cumsum()
-
-            pickle.dump(df, open(f"{filter_dataset_steps}_qwen_math_dataset.pkl", "wb"))
-
-            # Build index and size maps
-            self.index_map = {}
-            self.size_map = {}
-            self.len = 0
-            max_len = -1
-            max_steps = -1
-            max_len_idx = -1
-            max_steps_idx = -1
-
-            for row in df.itertuples():
-                self.index_map[self.len] = (row.dataset_idx, row.completion_idx)
-                self.size_map[self.len] = [row.cumulative_steps, row.cumulative_tokens]
-
-                if row.cumulative_steps > max_steps:
-                    max_steps = row.cumulative_steps
-                    max_steps_idx = self.len
-                if row.cumulative_tokens > max_len:
-                    max_len = row.cumulative_tokens
-                    max_len_idx = self.len
-
-                self.len += 1
-
-                    
-
-            print(f"Sanity check mode: max steps idx = {self.size_map[max_steps_idx]}, max len idx = {self.size_map[max_len_idx]}")
-            print(f"Total number of samples: {self.len}")
-            self.index_map[0], self.index_map[max_steps_idx] = self.index_map[max_steps_idx], self.index_map[0]
-            self.index_map[1], self.index_map[max_len_idx] = self.index_map[max_len_idx], self.index_map[1]
+        print(f"Sanity check mode: max steps idx = {self.size_map[max_steps_idx]}, max len idx = {self.size_map[max_len_idx]}")
+        print(f"Total number of samples: {self.len}")
+        self.index_map[0], self.index_map[max_steps_idx] = self.index_map[max_steps_idx], self.index_map[0]
+        self.index_map[1], self.index_map[max_len_idx] = self.index_map[max_len_idx], self.index_map[1]
 
     def __len__(self):
         if SANITY_CHECK:
@@ -208,7 +216,7 @@ class QwenMathMetaDataset(Dataset):
     ]
     where A, B, C are the steps of the trajectory.
     '''
-    def __init__(self, data, tokenizer, inference=False, filter_dataset_steps=-1):
+    def __init__(self, data, tokenizer, inference=False, filter_dataset_steps=-1, filter_dataset_token_size=-1):
         self.dataset = data
         self.tokenizer = tokenizer
         self.inference = inference
@@ -226,9 +234,15 @@ class QwenMathMetaDataset(Dataset):
             df = data
             self.dataset = HF_Dataset.from_pandas(data)
         
-        print(f"Total number of samples in the dataset: {len(df)}")
+        print(f"Total number of samples in the dataset after step filter: {len(df)}")
         # Count total words in the completions list
         df['total_word_count'] = df['completions'].progress_apply(lambda steps: sum(len(tokenizer(step)['input_ids']) for step in steps))
+
+        if filter_dataset_token_size > 0:
+            print(f"Filtering dataset to token size <= {filter_dataset_token_size}")
+            df = df[df['total_word_count'] <= filter_dataset_token_size].reset_index(drop=True)
+            print(f"Filtered dataset size: {len(df)}")
+            self.dataset = HF_Dataset.from_pandas(df)
 
         # Build index_map and size_map
         self.index_map = {i: idx for i, idx in enumerate(df.index)}
@@ -282,7 +296,7 @@ class QwenMathMetaDataset(Dataset):
     
     
 def build_dataloader(
-        tokenizer, train_batch_size, meta_batch_size, token_based=True, add_new_token=True, meta_dataset="AIME", filter_dataset_steps=-1, # "AIME" or "PRM800K"
+        tokenizer, train_batch_size, meta_batch_size, token_based=True, add_new_token=True, meta_dataset="AIME", filter_dataset_steps=-1, filter_dataset_token_size=-1, # "AIME" or "PRM800K"
         sanity_check=False
 ):
     
@@ -349,19 +363,21 @@ def build_dataloader(
         df = pd.concat([df1, df2], ignore_index=True)
         meta_dataset = HF_Dataset.from_pandas(df)
     
-    
+
+    train_dataset = QwenMathDataset(data['train'], tokenizer, special_tokens=token_based, filter_dataset_steps=filter_dataset_steps, filter_dataset_token_size=filter_dataset_token_size)
+
+    train_dataloader = DataLoader(train_dataset, batch_size=train_batch_size, shuffle=False if sanity_check else True, collate_fn=collate_merge_minibatch)
+    next(iter(train_dataloader)) 
+     
     if not token_based:
-        meta_dataset = QwenMathMetaDataset(meta_dataset, tokenizer, filter_dataset_steps=filter_dataset_steps)
+        meta_dataset = QwenMathMetaDataset(meta_dataset, tokenizer, filter_dataset_steps=filter_dataset_steps, filter_dataset_token_size=filter_dataset_token_size)
     else:
-        meta_dataset =  QwenMathDataset(meta_dataset, tokenizer, has_subjects=False, filter_dataset_steps=filter_dataset_steps)
+        meta_dataset =  QwenMathDataset(meta_dataset, tokenizer, has_subjects=False, filter_dataset_steps=filter_dataset_steps, filter_dataset_token_size=filter_dataset_token_size)
         
     meta_dataloader = DataLoader(meta_dataset, batch_size=meta_batch_size, shuffle=False if sanity_check else True, collate_fn=collate_merge_minibatch)
     next(iter(meta_dataloader))  
 
-    train_dataset = QwenMathDataset(data['train'], tokenizer, special_tokens=token_based, filter_dataset_steps=filter_dataset_steps)
-
-    train_dataloader = DataLoader(train_dataset, batch_size=train_batch_size, shuffle=False if sanity_check else True, collate_fn=collate_merge_minibatch)
-    next(iter(train_dataloader))  
+ 
     paths = "aime_outputs/"
     
     dataloader_benchmark = {}

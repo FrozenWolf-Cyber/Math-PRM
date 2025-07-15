@@ -50,6 +50,7 @@ parser.add_argument("--freeze_tokens",  action="store_true", help="Freeze other 
 parser.add_argument("--max_step_size", type=int, default=-1)
 parser.add_argument("--max_meta_steps_grad", type=int, default=-1)
 parser.add_argument("--filter_dataset_steps", type=int, default=20, help="Max number of steps to filter dataset")
+parser.add_argument("--filter_dataset_token_size", type=int, default=2000, help="Max tokens to filter dataset")
 parser.add_argument("--wandb_mode", type=str, default="online", help="wandb mode")
 parser.add_argument("--freeze_all_but_bias", action="store_true")
 
@@ -116,6 +117,7 @@ resume_labels = None
     meta_dataset=args.meta_dataset,
     sanity_check=sanity_check,
     filter_dataset_steps=args.filter_dataset_steps,
+    filter_dataset_token_size=args.filter_dataset_token_size
 )
 
 
