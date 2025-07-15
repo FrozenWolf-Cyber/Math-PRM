@@ -332,7 +332,12 @@ class Lower(ImplicitProblem):
 
     def configure_module(self):
         model = configure_module(args, device)
+        model.base_model = model.base_model.to(device)
+        model.LN = model.LN.to(device)
         print("Lower model configured with device:", model.base_model.device)
+        #### debug print each param device:
+        for name, param in model.named_parameters():
+            print(f"Parameter: {name}, Device: {param.device}, Requires Grad: {param.requires_grad}")
         return model
 
 
