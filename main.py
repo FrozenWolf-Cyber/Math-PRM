@@ -332,7 +332,7 @@ class Lower(ImplicitProblem):
 
     def configure_module(self):
         model = configure_module(args, device)
-        print("Lower model configured with device:", model.device)
+        print("Lower model configured with device:", model.base_model.device)
         return model
 
 
