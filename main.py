@@ -261,7 +261,7 @@ class Lower(ImplicitProblem):
         attention_mask = batch['attention_mask'].to(device)
         labels = batch['label'].to(dtype=torch.float).to(device)
         domain_strings = batch['dataset']
-        print(input_ids.device, self.module.device)
+        print(input_ids.device, self.module.base_model.device)
         print("lower", input_ids.shape, attention_mask.shape, labels.shape, batch['correctness'])
         score = self.forward(input_ids=input_ids, attention_mask=attention_mask)
         print("lower score shape:", score.shape)
