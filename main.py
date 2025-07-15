@@ -335,9 +335,6 @@ class Lower(ImplicitProblem):
         model.base_model = model.base_model.to(device)
         model.LN = model.LN.to(device)
         print("Lower model configured with device:", model.base_model.device)
-        #### debug print each param device:
-        for name, param in model.named_parameters():
-            print(f"Parameter: {name}, Device: {param.device}, Requires Grad: {param.requires_grad}")
         return model
 
 
@@ -472,4 +469,5 @@ dependencies = {"l2u": l2u, "u2l": u2l}
 engine = ReweightingEngine(
     config=engine_config, problems=problems, dependencies=dependencies
 )
+engine.device = device
 engine.run()
