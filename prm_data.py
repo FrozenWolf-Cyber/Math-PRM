@@ -68,7 +68,8 @@ class QwenMathDataset(Dataset):
             print(f"Filtering dataset to steps <= {filter_dataset_steps}")
             data = data.to_pandas()
             data = data[data['completions'].apply(lambda x: len(x) <= filter_dataset_steps)].reset_index(drop=True)
-            data = data.drop(columns=['__index_level_0__'])
+            if '__index_level_0__' in data.columns:
+                data = data.drop(columns=['__index_level_0__'])
             self.dataset = HF_Dataset.from_pandas(data)
         
         if SEP_TOKEN == '<PRM_STEP_SCORE>':
