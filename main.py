@@ -124,8 +124,9 @@ resume_labels = None
 
 
 ### log the configurations to wandb
+mode = args.wandb_mode
 
-wandb.init(project="DreamPRM-AIME", mode="offline" if sanity_check else "online", config=args)
+wandb.init(project="DreamPRM-AIME", mode=mode, config=args)
 
 if not sanity_check:
     run_name = wandb.run.name
