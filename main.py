@@ -179,7 +179,7 @@ class Upper(ImplicitProblem):
               
         # print("Device:", score.device)
 
-        
+        print("Upper score ", score)
         if args.model_type == "token":
             if args.dreamprm_loss: ### using overall problem solution correctness
                 ### dreamprm loss, score -> (B, T,)
@@ -205,6 +205,7 @@ class Upper(ImplicitProblem):
             nproblems = set(batch['index']) # [0, 1, 2, B_Size-1]
             # score -> (B * T*(T+1)/2) So [A_0_1, A_0_2,.. B_0_1, B_0_2,...] in cummulative order
             score = torch.log(score / (1 - score))
+            print(score)
             outputs = []
             for i in nproblems:
                 mean_score = 0
