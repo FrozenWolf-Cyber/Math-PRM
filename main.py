@@ -150,6 +150,7 @@ class Upper(ImplicitProblem):
         return self.module(domain_strings, x)
 
     def training_step(self, batch):
+        print(self.module.raw_weights)
         labels = batch['label'].to(device) ## (B, T)
         print("upper",labels.shape, batch['input_ids'].shape, batch['correctness'])
         correctness = torch.tensor(batch['correctness'], dtype=torch.float).to(device) ## (B, )
@@ -260,6 +261,7 @@ class Lower(ImplicitProblem):
         return self.module(input_ids, attention_mask, no_grad=no_grad)
 
     def training_step(self, batch):
+        print(self.upper.module.raw_weights)
         labels = batch['label'].to(dtype=torch.float).to(device)
         domain_strings = batch['dataset']
         print("lower", batch['input_ids'].shape, batch['attention_mask'].shape, labels.shape, batch['correctness'])
