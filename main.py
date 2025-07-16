@@ -260,13 +260,16 @@ class Lower(ImplicitProblem):
         return self.module(input_ids, attention_mask, no_grad=no_grad)
 
     def training_step(self, batch):
-        input_ids = batch['input_ids'].to(device)
-        attention_mask = batch['attention_mask'].to(device)
         labels = batch['label'].to(dtype=torch.float).to(device)
         domain_strings = batch['dataset']
         print(input_ids.device, self.module.base_model.device)
         print("lower", input_ids.shape, attention_mask.shape, labels.shape, batch['correctness'])
-        score = self.forward(input_ids=input_ids, attention_mask=attention_mask)
+        if args.max_step_size == -1:
+            max_step_size = len(batch['input_ids'])
+        else:
+            max_step_size = args.max_step_size
+        score = unbatch_process(batch, device, self.forward, max_step_size)
+         
         print("lower score shape:", score.shape)
         del input_ids, attention_mask
         gc.collect()
