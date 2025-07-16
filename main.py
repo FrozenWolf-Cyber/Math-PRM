@@ -181,7 +181,7 @@ class Upper(ImplicitProblem):
               
         # print("Device:", score.device)
 
-
+        print("Upper score ", score)
         if args.model_type == "token":
             if args.dreamprm_loss: ### using overall problem solution correctness
                 ### dreamprm loss, score -> (B, T,)
@@ -210,6 +210,7 @@ class Upper(ImplicitProblem):
             nproblems = set(batch['index']) # [0, 1, 2, B_Size-1]
             # score -> (B * T*(T+1)/2) So [A_0_1, A_0_2,.. B_0_1, B_0_2,...] in cummulative order
             score = torch.log(score / (1 - score))
+            print(score)
             outputs = []
             for i in nproblems:
                 mean_score = 0
@@ -221,16 +222,19 @@ class Upper(ImplicitProblem):
                             continue
                         mean_score += score[j]
                         step += 1
-                mean_score /= step
+                        
+                print("Step:", step, "Mean Score:", mean_score)
+                mean_score /= max(step, 1)
                 outputs.append(mean_score)
                 
             ## outputs -> (B, )
             ## label -> ## (B * T*(T+1)/2)
             outputs = torch.stack(outputs) # (B, )
             outputs = torch.sigmoid(outputs)
+            print("Upper outputs:", outputs)
             loss = criterion_meta(outputs, correctness)
                 
-
+        print("DEBUG", "UPPER", loss )
         if torch.isnan(loss).any() or torch.isinf(loss).any():
             ## clip the loss to avoid NaN
             print("NaN loss detected, clipping to zero upper loss")
@@ -318,6 +322,7 @@ class Lower(ImplicitProblem):
             
             del non_filler, reversed_non_filler, reversed_index, index
         
+        print("DEBUG", "LOWER", loss )
         if torch.isnan(loss).any() or torch.isinf(loss).any():
             ## clip the loss to avoid NaN
             print("NaN loss detected, clipping to zero, lower loss")
