@@ -221,6 +221,7 @@ class Upper(ImplicitProblem):
             outputs = torch.sigmoid(outputs)
             loss = criterion_meta(outputs, correctness)
                 
+        print("DEBUG", "UPPER", loss )
         if torch.isnan(loss).any():
             ## clip the loss to avoid NaN
             print("NaN loss detected, clipping to zero upper loss")
@@ -229,8 +230,9 @@ class Upper(ImplicitProblem):
         upper_loss.append(loss.item())
 
         # torch.cuda.empty_cache()
-        if len(upper_loss) == 10:
+        if len(upper_loss) == 5:
             mean_outer_loss = np.mean(upper_loss)
+            print(f"Outer Loss: {mean_outer_loss}")
             wandb.log({"outer_loss": mean_outer_loss})
             upper_loss.clear()
 
@@ -307,6 +309,7 @@ class Lower(ImplicitProblem):
             
             del non_filler, reversed_non_filler, reversed_index, index
         
+        print("DEBUG", "LOWER", loss )
         if torch.isnan(loss).any():
             ## clip the loss to avoid NaN
             print("NaN loss detected, clipping to zero, lower loss")
@@ -335,6 +338,7 @@ class Lower(ImplicitProblem):
             mean_inner_weighted_loss = np.mean(lower_weighted_loss)
             wandb.log({"inner_loss": mean_inner_loss,
                        "inner_weighted_loss": mean_inner_weighted_loss, })
+            print(f"Inner Loss: {mean_inner_loss}, Inner Weighted Loss: {mean_inner_weighted_loss}")
             lower_loss.clear()
             lower_weighted_loss.clear()
         # torch.cuda.empty_cache()
