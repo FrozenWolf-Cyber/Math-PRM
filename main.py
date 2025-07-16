@@ -188,6 +188,8 @@ class Upper(ImplicitProblem):
                 mask = (labels != -100).float()
                 score = score / (1 - score)
                 score = torch.log(score) # (B, T)
+                ### set nan scores mask t zero
+                score[torch.isnan(score)] = 0
                 score = score* mask # (B, T)
                 mean_score = torch.sum(score, dim=1) / mask.sum(dim=1) # (B, )
                 outputs = torch.sigmoid(mean_score) # (B, )
@@ -214,6 +216,9 @@ class Upper(ImplicitProblem):
                 step = 0
                 for j in range(len(score)):
                     if batch['index'][j] == i:
+                        if torch.isnan(score[j]).any():
+                            print("!!!!!NaN subs score detected, skipping this score")
+                            continue
                         mean_score += score[j]
                         step += 1
                 mean_score /= step
