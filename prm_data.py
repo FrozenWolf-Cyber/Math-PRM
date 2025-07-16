@@ -106,7 +106,7 @@ class QwenMathDataset(Dataset):
         df = pd.DataFrame(rows)
         # Group by dataset_idx and compute cumulative token length
         
-        if len(df) > 1000000:
+        if len(df) > 100000:
             if os.path.exists(f"{len(df)}_qwen_math_dataset.pkl"):
                 print(f"Loading preprocessed dataset from {len(df)}_qwen_math_dataset.pkl")
                 with open(f"{len(df)}_qwen_math_dataset.pkl", "rb") as f:
