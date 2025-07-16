@@ -371,7 +371,9 @@ class ReweightingEngine(Engine):
         
         #### log this domain weights to wandb # self.raw_weights = nn.Parameter(torch.zeros(self.num_domains))
         wts = self.upper.module.raw_weights
+        print("Raw Weights:", wts)
         positive_weights = torch.nn.functional.softplus(wts)
+        print("Positive Weights:", positive_weights)
         mean_weights = positive_weights.mean()
         wts = (positive_weights / mean_weights).cpu().numpy()
         
