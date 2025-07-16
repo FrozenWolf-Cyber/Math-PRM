@@ -144,7 +144,7 @@ class QwenMathDataset(Dataset):
             self.len += 1
                 
         print(f"Sanity check mode: max steps idx = {self.size_map[max_steps_idx]}, max len idx = {self.size_map[max_len_idx]}")
-        print(f"Total number of samples: {self.len}")
+        print(f"Total number of samples: {self.len}\n\n")
         self.index_map[0], self.index_map[max_steps_idx] = self.index_map[max_steps_idx], self.index_map[0]
         self.index_map[1], self.index_map[max_len_idx] = self.index_map[max_len_idx], self.index_map[1]
 
@@ -255,7 +255,7 @@ class QwenMathMetaDataset(Dataset):
         self.len = len(df)
                 
         print(f"Sanity check mode:  max len idx = {self.size_map[max_len_idx]} at {max_len_idx}")
-        print(f"Total number of samples: {self.len}")
+        print(f"Total number of samples: {self.len}\n\n")
         self.index_map[0], self.index_map[max_len_idx] = self.index_map[max_len_idx], self.index_map[0]
         
                     
