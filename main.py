@@ -52,6 +52,7 @@ parser.add_argument("--max_meta_steps_grad", type=int, default=-1)
 parser.add_argument("--filter_dataset_steps", type=int, default=20, help="Max number of steps to filter dataset")
 parser.add_argument("--filter_dataset_token_size", type=int, default=2000, help="Max tokens to filter dataset")
 parser.add_argument("--wandb_mode", type=str, default="online", help="wandb mode")
+parser.add_argument("--notes", type=str, default="", help="wandb notes")
 parser.add_argument("--freeze_all_but_bias", action="store_true")
 
 args = parser.parse_args()
@@ -150,9 +151,7 @@ class Upper(ImplicitProblem):
         return self.module(domain_strings, x)
 
     def training_step(self, batch):
-        print(self.module.raw_weights)
         labels = batch['label'].to(device) ## (B, T)
-        print("upper",labels.shape, batch['input_ids'].shape, batch['correctness'])
         correctness = torch.tensor(batch['correctness'], dtype=torch.float).to(device) ## (B, )
 
         max_meta_steps_grad = args.max_meta_steps_grad
@@ -167,11 +166,9 @@ class Upper(ImplicitProblem):
             with torch.set_grad_enabled(False):
                 if len(batch['input_ids']) > max_meta_steps_grad:
                     score_nograd = unbatch_process(batch, device, self.lower, max_step_size, no_grad=True, start=0, end=len(batch['input_ids'])-max_meta_steps_grad)
-                    print("score_nograd shape:", score_nograd.shape)
             with torch.set_grad_enabled(True):
                 score = unbatch_process(batch, device, self.lower, max_step_size, no_grad=False, start=max(0,len(batch['input_ids'])-max_meta_steps_grad), end=len(batch['input_ids']))
             
-            print( "score_grad shape:", score.shape)
             if score_nograd is not None:
                 score = torch.cat((score_nograd, score), dim=0)
         
@@ -179,7 +176,6 @@ class Upper(ImplicitProblem):
             score = unbatch_process(batch, device, self.lower, max_step_size)
               
         # print("Device:", score.device)
-        print("upper score shape:", score.shape)
 
         
         if args.model_type == "token":
@@ -188,14 +184,10 @@ class Upper(ImplicitProblem):
                 mask = (labels != -100).float()
                 score = score / (1 - score)
                 score = torch.log(score) # (B, T)
-                print("score:", score)
                 score = score* mask # (B, T)
-                print("score shape:", score.shape, "mask shape:", mask.shape)
                 mean_score = torch.sum(score, dim=1) / mask.sum(dim=1) # (B, )
-                print("mean_score shape:", mean_score.shape)
                 outputs = torch.sigmoid(mean_score) # (B, )
                 loss = criterion_meta(outputs, correctness)
-                print("======Correctness:", correctness, outputs)
             else:
                 ### avg cross entropy loss -> per step annotations
                 mask = (labels != -100).float()
@@ -228,7 +220,7 @@ class Upper(ImplicitProblem):
             outputs = torch.sigmoid(outputs)
             loss = criterion_meta(outputs, correctness)
                 
-        print("upper loss shape:", loss.shape, loss)
+
         upper_loss.append(loss.item())
 
         # torch.cuda.empty_cache()
@@ -263,17 +255,14 @@ class Lower(ImplicitProblem):
         return self.module(input_ids, attention_mask, no_grad=no_grad)
 
     def training_step(self, batch):
-        print(self.upper.module.raw_weights)
         labels = batch['label'].to(dtype=torch.float).to(device)
         domain_strings = batch['dataset']
-        print("lower", batch['input_ids'].shape, batch['attention_mask'].shape, labels.shape, batch['correctness'])
         if args.max_step_size == -1:
             max_step_size = len(batch['input_ids'])
         else:
             max_step_size = args.max_step_size
         score = unbatch_process(batch, device, self.forward, max_step_size)
          
-        print("lower score shape:", score.shape)
         gc.collect()
         torch.cuda.empty_cache()
         # print("lower",score.shape, labels.shape, batch['correctness'])
@@ -313,7 +302,6 @@ class Lower(ImplicitProblem):
             
             del non_filler, reversed_non_filler, reversed_index, index
         
-        print("lower loss shape:", loss.shape)
         torch.cuda.empty_cache()
         gc.collect()
         
@@ -399,10 +387,8 @@ class ReweightingEngine(Engine):
                         max_step_size = len(batch['input_ids'])
                     else:
                         max_step_size = args.max_step_size
-                    print("validation: batch['input_ids'].shape:", batch['input_ids'].shape)
                     score = unbatch_process(batch, device, self.lower, max_step_size, no_grad=True).cpu()
-                    print("validation: score.shape:", score.shape)
-                    
+      
                     if args.model_type == "token":
                         # score -> (B, T,)
                         labels = batch['label'].to(dtype=torch.float).to("cpu")

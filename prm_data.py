@@ -159,7 +159,6 @@ class QwenMathDataset(Dataset):
 
     def __getitem__(self, idx):
         if (not self.special_tokens) or SANITY_CHECK: ### if not token model, we need to pass all steps
-            print("Sameple with index:", idx, "has index map:", idx in self.index_map)
             idx, step_idx = self.index_map[idx]
             prompt = self.dataset[idx]['prompt']
             completions = self.dataset[idx]['completions'][:step_idx+1]
