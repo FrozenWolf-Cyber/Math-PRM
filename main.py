@@ -190,6 +190,7 @@ class Upper(ImplicitProblem):
                 score = torch.log(score) # (B, T)
                 ### set nan scores mask t zero
                 score[torch.isnan(score)] = 0
+                score[torch.isinf(score)] = 0
                 score = score* mask # (B, T)
                 mean_score = torch.sum(score, dim=1) / mask.sum(dim=1) # (B, )
                 outputs = torch.sigmoid(mean_score) # (B, )
@@ -216,7 +217,7 @@ class Upper(ImplicitProblem):
                 step = 0
                 for j in range(len(score)):
                     if batch['index'][j] == i:
-                        if torch.isnan(score[j]).any():
+                        if torch.isnan(score[j]).any() or torch.isinf(score[j]).any():
                             print("!!!!!NaN subs score detected, skipping this score")
                             continue
                         mean_score += score[j]
@@ -228,10 +229,11 @@ class Upper(ImplicitProblem):
             ## label -> ## (B * T*(T+1)/2)
             outputs = torch.stack(outputs) # (B, )
             outputs = torch.sigmoid(outputs)
+            print("Upper outputs:", outputs)
             loss = criterion_meta(outputs, correctness)
                 
         print("DEBUG", "UPPER", loss )
-        if torch.isnan(loss).any():
+        if torch.isnan(loss).any() or torch.isinf(loss).any():
             ## clip the loss to avoid NaN
             print("NaN loss detected, clipping to zero upper loss")
             loss = torch.clamp(loss, min=0, max=1e3)
@@ -319,7 +321,7 @@ class Lower(ImplicitProblem):
             del non_filler, reversed_non_filler, reversed_index, index
         
         print("DEBUG", "LOWER", loss )
-        if torch.isnan(loss).any():
+        if torch.isnan(loss).any() or torch.isinf(loss).any():
             ## clip the loss to avoid NaN
             print("NaN loss detected, clipping to zero, lower loss")
             loss = torch.clamp(loss, min=0, max=1e3)
@@ -334,7 +336,7 @@ class Lower(ImplicitProblem):
         # print("lower loss",loss)
         weighted_loss = torch.mean(self.upper(domain_strings, loss))
         
-        if torch.isnan(weighted_loss).any():
+        if torch.isnan(weighted_loss).any() or torch.isinf(weighted_loss).any():
             ## clip the loss to avoid NaN
             print("NaN loss detected, clipping to zero in lower weighted loss")
             weighted_loss = torch.clamp(weighted_loss, min=0, max=1e3)
