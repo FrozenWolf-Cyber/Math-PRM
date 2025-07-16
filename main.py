@@ -131,6 +131,8 @@ wandb.init(project="DreamPRM-AIME", mode=mode, config=args)
 if not sanity_check:
     run_name = wandb.run.name
     print(f"Run name: {run_name}")
+    if run_name is None:
+        run_name = "default_run"
     ### edit the save path to include the run name
     args.weights_path = os.path.join(args.weights_path, run_name)
     if not os.path.exists(args.weights_path):
