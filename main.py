@@ -54,6 +54,7 @@ parser.add_argument("--filter_dataset_token_size", type=int, default=2000, help=
 parser.add_argument("--wandb_mode", type=str, default="online", help="wandb mode")
 parser.add_argument("--notes", type=str, default="", help="wandb notes")
 parser.add_argument("--freeze_all_but_bias", action="store_true")
+parser.add_argument("--gradient_clipping", type=float, default=1.0, help="Gradient clipping value")
 
 args = parser.parse_args()
 print(args)
@@ -220,7 +221,11 @@ class Upper(ImplicitProblem):
             outputs = torch.sigmoid(outputs)
             loss = criterion_meta(outputs, correctness)
                 
-
+        if torch.isnan(loss).any():
+            ## clip the loss to avoid NaN
+            print("NaN loss detected, clipping to zero upper loss")
+            loss = torch.clamp(loss, min=0, max=1e3)
+            
         upper_loss.append(loss.item())
 
         # torch.cuda.empty_cache()
@@ -302,6 +307,11 @@ class Lower(ImplicitProblem):
             
             del non_filler, reversed_non_filler, reversed_index, index
         
+        if torch.isnan(loss).any():
+            ## clip the loss to avoid NaN
+            print("NaN loss detected, clipping to zero, lower loss")
+            loss = torch.clamp(loss, min=0, max=1e3)
+        
         torch.cuda.empty_cache()
         gc.collect()
         
@@ -311,6 +321,13 @@ class Lower(ImplicitProblem):
         loss = loss.unsqueeze(1)  # (B, 1)
         # print("lower loss",loss)
         weighted_loss = torch.mean(self.upper(domain_strings, loss))
+        
+        if torch.isnan(weighted_loss).any():
+            ## clip the loss to avoid NaN
+            print("NaN loss detected, clipping to zero in lower weighted loss")
+            weighted_loss = torch.clamp(weighted_loss, min=0, max=1e3)
+        
+        
         lower_loss.append(torch.mean(loss).item())
         lower_weighted_loss.append(torch.mean(weighted_loss).item())
         if len(lower_loss) == 100:
@@ -343,11 +360,11 @@ class Lower(ImplicitProblem):
         )
         return optimizer
 
-    def configure_scheduler(self):
-        scheduler = optim.lr_scheduler.StepLR(
-            self.optimizer, step_size = args.scheduler_step_size, gamma=args.scheduler_gamma
-        )
-        return scheduler
+    # def configure_scheduler(self):
+    #     scheduler = optim.lr_scheduler.StepLR(
+    #         self.optimizer, step_size = args.scheduler_step_size, gamma=args.scheduler_gamma
+    #     )
+    #     return scheduler
 
 
 
@@ -441,8 +458,8 @@ class ReweightingEngine(Engine):
         return all_scores
 
 
-upper_config = Config(type="darts", precision=args.precision, retain_graph=True)
-lower_config = Config(type="darts", precision=args.precision, unroll_steps=args.unroll_steps, gradient_accumulation=args.gradiant_accumulation)
+upper_config = Config(type="darts", precision=args.precision, retain_graph=True, gradient_clipping=args.gradient_clipping)
+lower_config = Config(type="darts", precision=args.precision, unroll_steps=args.unroll_steps, gradient_accumulation=args.gradiant_accumulation, gradient_clipping=args.gradient_clipping)
 engine_config = EngineConfig(
     train_iters=args.iteration_num,
     valid_step=args.save_every_iterations,
