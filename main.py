@@ -399,7 +399,7 @@ class ReweightingEngine(Engine):
                     
                     if args.model_type == "token":
                         # score -> (B, T,)
-                        labels = batch['label'].to(dtype=torch.float).to(device)
+                        labels = batch['label'].to(dtype=torch.float).to("cpu")
                         mask = (labels != -100)
                         score[mask] = 0
                         score = score / (1 - score)
