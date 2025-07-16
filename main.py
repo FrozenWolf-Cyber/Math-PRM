@@ -186,17 +186,16 @@ class Upper(ImplicitProblem):
             if args.dreamprm_loss: ### using overall problem solution correctness
                 ### dreamprm loss, score -> (B, T,)
                 mask = (labels != -100).float()
-                score[labels==-100] = 0
                 score = score / (1 - score)
-                score[labels==-100] = 1
                 score = torch.log(score) # (B, T)
+                print("score:", score)
                 score = score* mask # (B, T)
                 print("score shape:", score.shape, "mask shape:", mask.shape)
                 mean_score = torch.sum(score, dim=1) / mask.sum(dim=1) # (B, )
                 print("mean_score shape:", mean_score.shape)
                 outputs = torch.sigmoid(mean_score) # (B, )
                 loss = criterion_meta(outputs, correctness)
-                print("Correctness:", correctness, outputs)
+                print("======Correctness:", correctness, outputs)
             else:
                 ### avg cross entropy loss -> per step annotations
                 mask = (labels != -100).float()
