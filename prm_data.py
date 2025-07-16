@@ -106,18 +106,17 @@ class QwenMathDataset(Dataset):
         df = pd.DataFrame(rows)
         # Group by dataset_idx and compute cumulative token length
         
-        if len(df) > 100000:
-            if os.path.exists(f"{len(df)}_qwen_math_dataset.pkl"):
-                print(f"Loading preprocessed dataset from {len(df)}_qwen_math_dataset.pkl")
-                with open(f"{len(df)}_qwen_math_dataset.pkl", "rb") as f:
-                    df1 = pickle.load(f)
-                    assert len(df1) == len(df), "Preprocessed dataset length mismatch."
-                    df = df1
-            else:
-                df['token_count'] = df['completion_text'].progress_apply(lambda x: len(tokenizer(x)['input_ids']))
-                pickle.dump(df, open(f"{len(df)}_qwen_math_dataset.pkl", "wb"))
+
+        if os.path.exists(f"{len(df)}_qwen_math_dataset.pkl"):
+            print(f"Loading preprocessed dataset from {len(df)}_qwen_math_dataset.pkl")
+            with open(f"{len(df)}_qwen_math_dataset.pkl", "rb") as f:
+                df1 = pickle.load(f)
+                assert len(df1) == len(df), "Preprocessed dataset length mismatch."
+                df = df1
         else:
             df['token_count'] = df['completion_text'].progress_apply(lambda x: len(tokenizer(x)['input_ids']))
+            pickle.dump(df, open(f"{len(df)}_qwen_math_dataset.pkl", "wb"))
+
             
         df['step_count'] = 1
         df['cumulative_tokens'] = df.groupby('dataset_idx')['token_count'].cumsum()
