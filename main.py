@@ -262,8 +262,7 @@ class Lower(ImplicitProblem):
     def training_step(self, batch):
         labels = batch['label'].to(dtype=torch.float).to(device)
         domain_strings = batch['dataset']
-        print(input_ids.device, self.module.base_model.device)
-        print("lower", input_ids.shape, attention_mask.shape, labels.shape, batch['correctness'])
+        print("lower", batch['input_ids'].shape, batch['attention_mask'].shape, labels.shape, batch['correctness'])
         if args.max_step_size == -1:
             max_step_size = len(batch['input_ids'])
         else:
