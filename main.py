@@ -191,9 +191,12 @@ class Upper(ImplicitProblem):
                 score[labels==-100] = 1
                 score = torch.log(score) # (B, T)
                 score = score* mask # (B, T)
+                print("score shape:", score.shape, "mask shape:", mask.shape)
                 mean_score = torch.sum(score, dim=1) / mask.sum(dim=1) # (B, )
+                print("mean_score shape:", mean_score.shape)
                 outputs = torch.sigmoid(mean_score) # (B, )
                 loss = criterion_meta(outputs, correctness)
+                print("Correctness:", correctness, outputs)
             else:
                 ### avg cross entropy loss -> per step annotations
                 mask = (labels != -100).float()
@@ -226,7 +229,7 @@ class Upper(ImplicitProblem):
             outputs = torch.sigmoid(outputs)
             loss = criterion_meta(outputs, correctness)
                 
-        print("upper loss shape:", loss.shape)
+        print("upper loss shape:", loss.shape, loss)
         upper_loss.append(loss.item())
 
         # torch.cuda.empty_cache()
