@@ -270,7 +270,6 @@ class Lower(ImplicitProblem):
         score = unbatch_process(batch, device, self.forward, max_step_size)
          
         print("lower score shape:", score.shape)
-        del input_ids, attention_mask
         gc.collect()
         torch.cuda.empty_cache()
         # print("lower",score.shape, labels.shape, batch['correctness'])
