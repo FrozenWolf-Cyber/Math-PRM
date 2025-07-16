@@ -69,8 +69,10 @@ class QwenMathTokenClf_RM(nn.Module):
         logits = outputs.logits
         logits = self.LN(logits).to(dtype=torch.float)  # Apply linear layer to logits
         # print(outputs)
+        print("Logits shape:", logits.shape)
         logits = F.softmax(logits)[..., 1]  # Assuming the second class is the one we want to predict
         # print(value_outputs)
+        print("Processed logits shape:", logits.shape)
         return logits.squeeze(dim=1)
         
         
