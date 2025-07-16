@@ -152,12 +152,12 @@ class QwenMathDataset(Dataset):
             print("Sanity check mode: returning 10 samples.")
             return 10
         if self.special_tokens:
-            return self.len
-        else:
             return len(self.dataset)
+        else:
+            return self.len
 
     def __getitem__(self, idx):
-        if not self.special_tokens:
+        if not self.special_tokens: ### if not token model, we need to pass all steps
             idx, step_idx = self.index_map[idx]
             prompt = self.dataset[idx]['prompt']
             completions = self.dataset[idx]['completions'][:step_idx+1]
@@ -166,8 +166,7 @@ class QwenMathDataset(Dataset):
                 dset = subjects_map['Others']
             else:
                 dset = subjects_map[self.dataset[idx]['subject']]
-        else:
-            print("Index, step_idx:", idx, "Total steps:", len(self.dataset[idx]))
+        else: #### if token model, only 1 pass required
             prompt = self.dataset[idx]['prompt']
             completions = self.dataset[idx]['completions']
             raw_labels = self.dataset[idx]['labels']
