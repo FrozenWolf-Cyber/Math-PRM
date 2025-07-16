@@ -419,3 +419,91 @@ def build_dataloader(
 
 
     return train_dataloader, meta_dataloader, dataloader_benchmark
+
+
+
+
+
+def build_vanilla_inference_dataloader(
+        tokenizer, meta_batch_size):
+    
+    global SEP_TOKEN 
+    SEP_TOKEN= "\n"
+
+    def collate_merge_minibatch(batch):
+        if len(batch[0]) == 6:
+            names = ["input_ids", "attention_mask", "label", "dataset", "index", "correctness"]
+        elif len(batch[0]) == 5:
+            names = ["input_ids", "attention_mask", "label", "index", "correctness"]
+        else:
+            raise ValueError("Batch items must contain 4 or 5 elements.")
+
+        merged = {}
+
+        for name_idx, item in enumerate(zip(*batch)):
+            j = []
+            for i in item:
+                j+=i
+
+            if isinstance(j[0], torch.Tensor):
+                max_len = max([i.shape[-1] for i in j ])
+            for i in range(len(j)):    
+                if isinstance(j[i], torch.Tensor):
+                    if names[name_idx] == "input_ids":
+                        j[i] = torch.cat((j[i], torch.ones(1, max_len - j[i].shape[-1], dtype=j[i].dtype)*tokenizer.pad_token_id), dim=-1)
+                    elif names[name_idx] == "attention_mask":
+                        j[i] = torch.cat((j[i], torch.zeros(1, max_len - j[i].shape[-1], dtype=j[i].dtype)), dim=-1)
+                    elif names[name_idx] == "label":
+                        j[i] = torch.cat((j[i], torch.ones(1, max_len - j[i].shape[-1], dtype=j[i].dtype)*-100), dim=-1)
+                    elif names[name_idx] == "correctness":
+                        j[i] = torch.tensor(j[i]).long()
+
+            if isinstance(j[0], torch.Tensor):
+                j = torch.cat(j, dim=0)
+
+            merged[names[name_idx]] = j
+
+        return merged
+
+
+    
+ 
+    paths = "aime_outputs/"
+    
+    dataloader_benchmark = {}
+
+
+    for ds in os.listdir(paths):
+        dataloader_benchmark[ds] = {}
+        ds_ = os.path.join(paths, ds)
+        
+        for model_out in os.listdir(ds_):
+            model_out = os.path.join(ds_, model_out)
+            path = os.listdir(model_out)[0]
+            path = os.path.join(model_out, path)
+            output = pd.read_json(path_or_buf=path, lines=True)
+            print(f"Loading {path} with {len(output)} samples")
+            output["index"] = output.index
+            output = output.explode(["generated_responses", "answers_correctness"]).reset_index(drop=True)
+            # sep = "\n" if "o4" in model_out else "\n\n"
+            sep = "\n\n"
+            output["generated_responses"] = output["generated_responses"].apply(lambda x: x.split(sep))
+            output.rename(columns={"generated_responses": "completions"}, inplace=True)
+            output["labels"] = [
+                        [val] * len(completions)
+                        for val, completions in zip(output["answers_correctness"], output["completions"])
+                    ]
+            output["subject"] = "Others" ## filler values
+
+            test_ds = HF_Dataset.from_pandas(output)
+    
+
+            dataset = QwenMathDataset(test_ds, tokenizer, special_tokens=True, has_subjects=False, inference=True) 
+
+            dataloader = DataLoader(dataset, batch_size=meta_batch_size, shuffle=False, collate_fn=collate_merge_minibatch)
+
+            dataloader_benchmark[ds][model_out] = dataloader
+            next(iter(dataloader))
+
+
+    return dataloader_benchmark
