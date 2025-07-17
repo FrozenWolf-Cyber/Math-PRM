@@ -95,11 +95,6 @@ class QwenMathCondGen_RM(nn.Module):
             self.add_token()
         self.LN = nn.Linear(self.base_model.config.vocab_size, 1, device=device, dtype=dtype)
         self.sigmoid = nn.Sigmoid()
-        
-        if args.peft_rank != -1:
-            peft_config = LoraConfig(
-                task_type=TaskType.TOKEN_CLS, inference_mode=False, r=args.peft_ran, lora_alpha=16, lora_dropout=0.1, bias="all"
-            )
             
         
     def add_token(self):
@@ -138,6 +133,21 @@ def configure_module(args, device):
         model = QwenMathTokenClf_RM(device, args)
     else:
         model = QwenMathCondGen_RM(device, args)
+        
+    if args.peft_rank != -1:
+            peft_config = LoraConfig(
+            task_type=TaskType.TOKEN_CLS if args.model_type == "token" else TaskType.CAUSAL_LM,
+            r=args.peft_rank,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"] 
+        )
+            model.base_model = get_peft_model(model.base_model, peft_config)
+            print("Using PEFT model with LoRA configuration:\n","----"*10)
+            print(peft_config)
+            print("Trainable parameters in PEFT model:", model.base_model.print_trainable_parameters())
+            print("LN parameters:", sum(p.numel() for p in model.LN.parameters() if p.requires_grad))
+            
     if args.freeze_till_last:
         for param in model.base_model.parameters():
             param.requires_grad = False

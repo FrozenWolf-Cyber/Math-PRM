@@ -56,6 +56,9 @@ parser.add_argument("--notes", type=str, default="", help="wandb notes")
 parser.add_argument("--freeze_all_but_bias", action="store_true")
 parser.add_argument("--gradient_clipping", type=float, default=1.0, help="Gradient clipping value")
 parser.add_argument("--peft_rank", type=int, default=-1, help="Rank for PEFT, -1 for no PEFT")
+parser.add_argument("--lora_alpha", type=float, default=32.0, help="Alpha for LoRA")
+parser.add_argument("--lora_dropout", type=float, default=0.05, help="Dropout for LoRA")
+
 args = parser.parse_args()
 print(args)
 set_seed(args.seed)
@@ -396,8 +399,11 @@ class Lower(ImplicitProblem):
 class ReweightingEngine(Engine):
     @torch.no_grad()
     def validation(self):
-        torch.save(self.lower.module.state_dict(), f"{args.weights_path}/lower_weights.pt")
-
+        if args.peft_rank != -1:
+            torch.save(self.lower.module.state_dict(), f"{args.weights_path}/lower_weights.pt")
+        else:
+            self.lower.module.base_model.save_pretrained(f"{args.weights_path}/lower_weights")
+            torch.save(self.lower.module.LN.state_dict(), f"{args.weights_path}/lower_weights_LN.pt")
         torch.save(
             self.upper.state_dict(),
             f"{args.weights_path}/domain_weights.pt",

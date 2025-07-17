@@ -20,5 +20,6 @@ python main.py \
 --freeze_all_but_bias \
 --max_step_size 1 --max_meta_steps_grad 10 \
 --filter_dataset_steps 20 --filter_dataset_token_size 2000 \
+--peft_rank 8 --lora_alpha 16 --lora_dropout 0.05 \
  --sanity_check 
 
