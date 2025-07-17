@@ -198,6 +198,7 @@ def unbatch_process(batch, device, model, max_step_size, no_grad=False, start=No
     
     score_list = []
     for idx in range(start, end, max_step_size):
+        print(f"Processing batch from {idx} to {min(end, idx + max_step_size)}")
         input_ids = batch['input_ids'][idx:min(end, idx + max_step_size)].to(device)
         attn_mask = batch['attention_mask'][idx:min(end,idx + max_step_size)].to(device)
         score = model(input_ids.to(device),
