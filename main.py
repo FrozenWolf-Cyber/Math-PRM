@@ -507,6 +507,7 @@ engine_config = EngineConfig(
     roll_back=args.rollback,
     logger_type="wandb",
 )
+upper = Upper(name="upper", config=upper_config)
 lower = Lower(name="lower", config=lower_config)
 
 if args.baseline or args.retrain:
