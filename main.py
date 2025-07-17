@@ -160,7 +160,7 @@ class Upper(ImplicitProblem):
     def training_step(self, batch):
         labels = batch['label'].to(device) ## (B, T)
         correctness = torch.tensor(batch['correctness'], dtype=torch.float).to(device) ## (B, )
-
+        print("Upper shapes", batch['input_ids'].shape, labels.shape, correctness.shape)
         max_meta_steps_grad = args.max_meta_steps_grad
         if args.max_step_size == -1:
             max_step_size = len(batch['input_ids'])
@@ -240,6 +240,7 @@ class Upper(ImplicitProblem):
             ## outputs -> (B, )
             ## label -> ## (B * T*(T+1)/2)
             outputs = torch.stack(outputs) # (B, )
+            print("Outputs shape:", outputs.shape, "Correctness shape:", correctness.shape)
             outputs = torch.sigmoid(outputs)
             print("Upper outputs:", outputs)
             loss = criterion_meta(outputs, correctness)
@@ -286,6 +287,7 @@ class Lower(ImplicitProblem):
 
     def training_step(self, batch):
         labels = batch['label'].to(dtype=torch.float).to(device)
+        print("Lower shapes", batch['input_ids'].shape, labels.shape, batch['correctness'].shape)
         domain_strings = batch['dataset']
         if args.max_step_size == -1:
             max_step_size = len(batch['input_ids'])
@@ -340,6 +342,7 @@ class Lower(ImplicitProblem):
             del non_filler, reversed_non_filler, reversed_index, index
         
         print("DEBUG", "LOWER", loss )
+        print("Loss shape", loss.shape)
         if torch.isnan(loss).any() or torch.isinf(loss).any():
             ## clip the loss to avoid NaN
             print("NaN loss detected, clipping to zero, lower loss")
