@@ -23,7 +23,6 @@ model = args.reward_model
 tokenizer = AutoTokenizer.from_pretrained(model)
 new_tokens = ['<PRM_STEP_SCORE>']
 num_added_tokens = tokenizer.add_tokens(new_tokens)
-model.resize_token_embeddings(len(tokenizer))
 
 dataloader_benchmark = build_vanilla_inference_dataloader(
     tokenizer=tokenizer,
@@ -35,6 +34,8 @@ if not os.path.exists(path):
     os.makedirs(path)
 
 model = AutoModelForTokenClassification.from_pretrained(model, num_labels=2)
+model.resize_token_embeddings(len(tokenizer))
+
 train_dataset = load_dataset("FrozenWolf/prm800k")
 val_dataset = train_dataset['validation']
 train_dataset = train_dataset['train']
