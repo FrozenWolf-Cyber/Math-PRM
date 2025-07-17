@@ -180,7 +180,10 @@ class Upper(ImplicitProblem):
             score = unbatch_process(batch, device, self.lower, max_step_size)
               
         # print("Device:", score.device)
-
+        ### clip score between 0 and 1
+        print("Upper score before clamp", score)
+        score = torch.clamp(score, min=1e-3, max=1 - 1e-3)
+            
         print("Upper score ", score)
         if args.model_type == "token":
             if args.dreamprm_loss: ### using overall problem solution correctness
@@ -285,6 +288,10 @@ class Lower(ImplicitProblem):
          
         gc.collect()
         torch.cuda.empty_cache()
+        print("lower score", score)
+                    ### clip score between 0 and 1
+        score = torch.clamp(score, min=1e-3, max=1 - 1e-3)
+        print("lower score after clamp", score)
         # print("lower",score.shape, labels.shape, batch['correctness'])
         if args.model_type == "token":
             # if args.dreamprm_loss:
