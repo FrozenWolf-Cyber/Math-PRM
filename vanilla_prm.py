@@ -41,7 +41,7 @@ val_dataset = train_dataset['test']
 train_dataset = train_dataset['train']
 
 training_args = PRMConfig(
-    output_dir=f"{path}/Output-{args.reward_model.replace("/", "-")}",
+    output_dir=f"{path}/Output-{args.reward_model.replace('/', '-')}",
     eval_steps=10000,    
     logging_dir="./logs",     
     logging_strategy="steps",     
