@@ -160,7 +160,7 @@ class Upper(ImplicitProblem):
     def training_step(self, batch):
         labels = batch['label'].to(device) ## (B, T)
         correctness = torch.tensor(batch['correctness'], dtype=torch.float).to(device) ## (B, )
-        print("Upper shapes", batch['input_ids'].shape, labels.shape, correctness.shape)
+        print("Upper shapes", batch['input_ids'].shape, labels.shape, correctness)
         max_meta_steps_grad = args.max_meta_steps_grad
         if args.max_step_size == -1:
             max_step_size = len(batch['input_ids'])
