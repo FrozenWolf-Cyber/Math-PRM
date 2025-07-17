@@ -37,7 +37,7 @@ model = AutoModelForTokenClassification.from_pretrained(model, num_labels=2)
 model.resize_token_embeddings(len(tokenizer))
 
 train_dataset = load_dataset("FrozenWolf/prm800k")
-val_dataset = train_dataset['validation']
+val_dataset = train_dataset['test']
 train_dataset = train_dataset['train']
 
 training_args = PRMConfig(
