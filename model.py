@@ -3,6 +3,7 @@ import torch.nn.functional as F
 import torch
 import torch.nn as nn
 import gc
+from peft import LoraConfig, TaskType, get_peft_model
 DEBUG = True
 # # Define LoRA configuration
 # lora_config = LoraConfig(
@@ -94,6 +95,12 @@ class QwenMathCondGen_RM(nn.Module):
             self.add_token()
         self.LN = nn.Linear(self.base_model.config.vocab_size, 1, device=device, dtype=dtype)
         self.sigmoid = nn.Sigmoid()
+        
+        if args.peft_rank != -1:
+            peft_config = LoraConfig(
+                task_type=TaskType.TOKEN_CLS, inference_mode=False, r=args.peft_ran, lora_alpha=16, lora_dropout=0.1, bias="all"
+            )
+            
         
     def add_token(self):
         tokenizer = AutoTokenizer.from_pretrained(self.model_path, trust_remote_code=True)

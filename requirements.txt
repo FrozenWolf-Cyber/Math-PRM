@@ -8,3 +8,4 @@ word2number
 timeout-decorator
 latex2sympy2
 accelerate
+peft

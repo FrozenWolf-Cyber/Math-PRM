@@ -55,7 +55,7 @@ parser.add_argument("--wandb_mode", type=str, default="online", help="wandb mode
 parser.add_argument("--notes", type=str, default="", help="wandb notes")
 parser.add_argument("--freeze_all_but_bias", action="store_true")
 parser.add_argument("--gradient_clipping", type=float, default=1.0, help="Gradient clipping value")
-
+parser.add_argument("--peft_rank", type=int, default=-1, help="Rank for PEFT, -1 for no PEFT")
 args = parser.parse_args()
 print(args)
 set_seed(args.seed)
@@ -182,8 +182,9 @@ class Upper(ImplicitProblem):
         # print("Device:", score.device)
         ### clip score between 0 and 1
         print("Upper score before clamp", score)
+        score1 = torch.clamp(score, min=1e-3, max=1 - 1e-3)
+        print("Upper score after clamp", score1==score)
         score = torch.clamp(score, min=1e-3, max=1 - 1e-3)
-            
         print("Upper score ", score)
         if args.model_type == "token":
             if args.dreamprm_loss: ### using overall problem solution correctness
