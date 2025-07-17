@@ -21,7 +21,9 @@ print(f"Run name: {run_name}")
 
 model = args.reward_model
 tokenizer = AutoTokenizer.from_pretrained(model)
-
+new_tokens = ['<PRM_STEP_SCORE>']
+num_added_tokens = tokenizer.add_tokens(new_tokens)
+model.resize_token_embeddings(len(tokenizer))
 
 dataloader_benchmark = build_vanilla_inference_dataloader(
     tokenizer=tokenizer,
@@ -46,7 +48,8 @@ training_args = PRMConfig(
     report_to="wandb",         
     save_strategy="epoch",      
     save_total_limit=2,            
-    num_train_epochs=5,       
+    num_train_epochs=5, 
+    step_separator=new_tokens[0],      
     per_gpu_train_batch_size=10,  per_gpu_eval_batch_size=1      
 )
 trainer = PRMTrainer(model=model, args=training_args, processing_class=tokenizer, train_dataset=train_dataset, eval_dataset=val_dataset)

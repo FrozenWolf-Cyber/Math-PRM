@@ -9,3 +9,4 @@ timeout-decorator
 latex2sympy2
 accelerate
 peft
+trl
