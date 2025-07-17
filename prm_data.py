@@ -427,9 +427,6 @@ def build_dataloader(
 def build_vanilla_inference_dataloader(
         tokenizer, meta_batch_size):
     
-    global SEP_TOKEN 
-    SEP_TOKEN= "\n"
-
     def collate_merge_minibatch(batch):
         if len(batch[0]) == 6:
             names = ["input_ids", "attention_mask", "label", "dataset", "index", "correctness"]
