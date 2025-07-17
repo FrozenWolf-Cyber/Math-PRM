@@ -507,19 +507,22 @@ engine_config = EngineConfig(
     roll_back=args.rollback,
     logger_type="wandb",
 )
-upper = Upper(name="upper", config=upper_config)
-lower = Lower(name="lower", config=lower_config)
 
-if args.baseline or args.retrain:
-    problems = [lower]
-    u2l, l2u = {}, {}
+# Instantiate problems
+problems = [Lower(name='lower', config=lower_config)]
+dependencies = {}
+
+if not args.baseline:
+    problems.insert(0, Upper(name='upper', config=upper_config))
+    dependencies = {problems[0]: [problems[1]]}
+    print("Running META-LEARNING mode")
 else:
-    problems = [upper, lower]
-    u2l = {upper: [lower]}
-    l2u = {lower: [upper]}
-dependencies = {"l2u": l2u, "u2l": u2l}
+    print("Running BASELINE mode")
 
-engine = ReweightingEngine(
-    config=engine_config, problems=problems, dependencies=dependencies
+# Run
+engine = Engine(
+    config=engine_config,
+    problems=problems,
+    dependencies={'l2u': {}, 'u2l': dependencies}
 )
 engine.run()
