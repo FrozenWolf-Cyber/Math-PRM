@@ -111,20 +111,13 @@ resume_idxes = None
 resume_labels = None
 
 
-unique_data_name_cache = f"{args.train_batch_size}_{args.meta_batch_size}{args.model_type}_{args.add_new_token}_{args.meta_dataset}_{sanity_check}_{args.filter_dataset_steps}_{args.filter_dataset_token_size}.pkl"
 
-if os.path.exists(unique_data_name_cache):
-    (
+
+(
     train_dataloader,
     meta_dataloader,
     dataloader_benchmark
-) = pickle.load(open(unique_data_name_cache, "rb"))
-else:
-    (
-        train_dataloader,
-        meta_dataloader,
-        dataloader_benchmark
-    ) = build_dataloader(
+) = build_dataloader(
     tokenizer=tokenizer,
     train_batch_size= args.train_batch_size,
     meta_batch_size= args.meta_batch_size,

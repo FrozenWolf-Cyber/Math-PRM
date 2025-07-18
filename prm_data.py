@@ -364,15 +364,28 @@ def build_dataloader(
         meta_dataset = HF_Dataset.from_pandas(df)
     
 
-    train_dataset = QwenMathDataset(data['train'], tokenizer, special_tokens=token_based, filter_dataset_steps=filter_dataset_steps, filter_dataset_token_size=filter_dataset_token_size)
+    cache_train_name = f"qwen_math_train_dataset_{len(data['train'])}_steps_{filter_dataset_steps}_token_size_{filter_dataset_token_size}_token_based{token_based}.pkl"
+    if os.path.exists(cache_train_name):
+        train_dataset = pickle.load(open(cache_train_name, "rb"))
+    else:
+        train_dataset = QwenMathDataset(data['train'], tokenizer, special_tokens=token_based, filter_dataset_steps=filter_dataset_steps, filter_dataset_token_size=filter_dataset_token_size)
+        with open(cache_train_name, "wb") as f:
+            pickle.dump(train_dataset, f)
 
     train_dataloader = DataLoader(train_dataset, batch_size=train_batch_size, shuffle=False if sanity_check else True, collate_fn=collate_merge_minibatch)
     next(iter(train_dataloader)) 
      
-    if not token_based:
-        meta_dataset = QwenMathMetaDataset(meta_dataset, tokenizer, filter_dataset_steps=filter_dataset_steps, filter_dataset_token_size=filter_dataset_token_size)
+     
+    cache_meta_name = f"qwen_math_meta_dataset_{len(meta_dataset)}_steps_{filter_dataset_steps}_token_size_{filter_dataset_token_size}_token_based{token_based}.pkl"
+    if os.path.exists(cache_meta_name):
+        meta_dataset = pickle.load(open(cache_meta_name, "rb")) 
     else:
-        meta_dataset =  QwenMathDataset(meta_dataset, tokenizer, has_subjects=False, filter_dataset_steps=filter_dataset_steps, filter_dataset_token_size=filter_dataset_token_size)
+        if not token_based:
+            meta_dataset = QwenMathMetaDataset(meta_dataset, tokenizer, filter_dataset_steps=filter_dataset_steps, filter_dataset_token_size=filter_dataset_token_size)
+        else:
+            meta_dataset =  QwenMathDataset(meta_dataset, tokenizer, has_subjects=False, filter_dataset_steps=filter_dataset_steps, filter_dataset_token_size=filter_dataset_token_size)
+        
+        pickle.dump(meta_dataset, open(cache_meta_name, "wb"))
         
     meta_dataloader = DataLoader(meta_dataset, batch_size=meta_batch_size, shuffle=False if sanity_check else True, collate_fn=collate_merge_minibatch)
     next(iter(meta_dataloader))  
@@ -510,7 +523,7 @@ def load_data_custom(name):
     try:
         data = load_dataset(name)
     except:
-        print(f"Dataset {name} not found. Loading from local path.")
+        print(f"Dataset {name} not found. Loading from remote path.")
         os.system(f"git lfs install")
         if not os.path.exists(name.split('/')[-1]):
             print(f"Cloning dataset {name} from Hugging Face.")
