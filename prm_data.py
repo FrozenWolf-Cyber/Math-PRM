@@ -512,13 +512,13 @@ def load_data_custom(name):
     except:
         print(f"Dataset {name} not found. Loading from local path.")
         os.system(f"git lfs install")
-        if not os.path.exists(name):
+        if not os.path.exists(name.split('/')[-1]):
             print(f"Cloning dataset {name} from Hugging Face.")
             os.system(f"git clone https://huggingface.co/datasets/{name}")
         else:
             ### pull the latest changes
             print(f"Pulling latest changes for dataset {name}.")
-            os.system(f"cd {name} && git pull")
+            os.system(f"cd {name.split('/')[-1]} && git pull")
             
         data = load_dataset(name.split('/')[-1])
     return data
