@@ -195,13 +195,11 @@ class Upper(ImplicitProblem):
         # print("Device:", score.device)
         ### clip score between 0 and 1
         score = score.float()
-        print("Upper score before clamp", score)
         score1 = torch.clamp(score, min=1e-3, max=1 - 1e-3)
-        print("Upper score after clamp", score1==score)
         score = torch.clamp(score, min=1e-3, max=1 - 1e-3)
         score = torch.nan_to_num(score, nan=0.5, posinf=1.0 - 1e-3, neginf=1e-3)
 
-        print("Upper score ", score)
+        
         if args.model_type == "token":
             if args.dreamprm_loss: ### using overall problem solution correctness
                 ### dreamprm loss, score -> (B, T,)
@@ -225,6 +223,7 @@ class Upper(ImplicitProblem):
                 loss = loss.sum() / mask.sum()
                 
         else:
+            print("Upper score ", score)
             # print("batch['index']:", batch['index'], score.device)
             ### using overall problem solution correctness
             nproblems = set(batch['index']) # [0, 1, 2, B_Size-1]
