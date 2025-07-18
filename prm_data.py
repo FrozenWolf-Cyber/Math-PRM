@@ -520,5 +520,5 @@ def load_data_custom(name):
             print(f"Pulling latest changes for dataset {name}.")
             os.system(f"cd {name} && git pull")
             
-        data = load_dataset(name)
+        data = load_dataset(name.split('/')[-1])
     return data
