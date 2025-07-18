@@ -230,7 +230,6 @@ class Upper(ImplicitProblem):
             nproblems = set(batch['index']) # [0, 1, 2, B_Size-1]
             # score -> (B * T*(T+1)/2) So [A_0_1, A_0_2,.. B_0_1, B_0_2,...] in cummulative order
             score = torch.log(score / (1 - score))
-            print(score)
             print(score.shape)
             outputs = []
             for i in nproblems:
@@ -309,12 +308,11 @@ class Lower(ImplicitProblem):
         gc.collect()
         torch.cuda.empty_cache()
         score = score.float()
-        print("lower score", score)
                     ### clip score between 0 and 1
         score = torch.clamp(score, min=1e-3, max=1 - 1e-3)
         score = torch.nan_to_num(score, nan=0.5, posinf=1.0 - 1e-3, neginf=1e-3)
 
-        print("lower score after clamp", score)
+       
         # print("lower",score.shape, labels.shape, batch['correctness'])
         if args.model_type == "token":
             # if args.dreamprm_loss:
@@ -335,6 +333,7 @@ class Lower(ImplicitProblem):
             del mask, labels
                 
         else:
+            print("lower score after clamp", score)
             # score -> (B, )
             # labels -> (B, T)
             ### take last label that is not -100
