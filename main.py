@@ -15,6 +15,7 @@ from copy import deepcopy
 import pandas as pd
 from eval_aime import *
 import gc
+from model import round_robin_batch_ordering
  
 parser = argparse.ArgumentParser(description="DreamPRM")
 parser.add_argument('--weights_path', type=str)
@@ -166,22 +167,28 @@ class Upper(ImplicitProblem):
             max_step_size = len(batch['input_ids'])
         else:
             max_step_size = args.max_step_size
-            
         ### the last max_meta_steps_grad samples alone needs to be performaed with grad, rest without grad
         score_nograd = None
         if max_meta_steps_grad != -1 :
+            max_meta_steps_grad*=len(set(batch['index']))
+            
+            reverse_indices = round_robin_batch_ordering(batch)
             with torch.set_grad_enabled(False):
                 if len(batch['input_ids']) > max_meta_steps_grad:
+                    print("Number of grads steps considered B*grad_Step",max_meta_steps_grad)
                     score_nograd = unbatch_process(batch, device, self.lower, max_step_size, no_grad=True, start=0, end=len(batch['input_ids'])-max_meta_steps_grad)
             with torch.set_grad_enabled(True):
                 score = unbatch_process(batch, device, self.lower, max_step_size, no_grad=False, start=max(0,len(batch['input_ids'])-max_meta_steps_grad), end=len(batch['input_ids']))
-            
             if score_nograd is not None:
                 score = torch.cat((score_nograd, score), dim=0)
-        
+          
+            batch['index'] = batch['index'][reverse_indices]
+            batch['index'] = batch['index'].tolist()
+            print("Batch index after reverse:", batch['index'])
+            score = score[reverse_indices] # (B, T*(T+1)/2)
         else:
             score = unbatch_process(batch, device, self.lower, max_step_size)
-              
+            
         # print("Device:", score.device)
         ### clip score between 0 and 1
         score = score.float()
@@ -221,6 +228,7 @@ class Upper(ImplicitProblem):
             # score -> (B * T*(T+1)/2) So [A_0_1, A_0_2,.. B_0_1, B_0_2,...] in cummulative order
             score = torch.log(score / (1 - score))
             print(score)
+            print(score.shape)
             outputs = []
             for i in nproblems:
                 mean_score = 0

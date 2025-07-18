@@ -11,7 +11,7 @@ python main.py \
 --weights_path "weights" \
 --iteration_num 100000 \
 --unroll_steps 5 \
---meta_batch_size 1 \
+--meta_batch_size 2 \
 --train_batch_size 1 \
 --reward_model "Qwen/Qwen2-0.5B" \
 --model_type "classifier" \

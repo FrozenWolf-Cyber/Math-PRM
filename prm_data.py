@@ -346,17 +346,17 @@ def build_dataloader(
         return merged
 
 
-    data = load_dataset("FrozenWolf/prm800k")
+    data = load_data_custom("FrozenWolf/prm800k")
     
 
     assert meta_dataset in ["AIME", "PRM800K", "both"], "Meta dataset must be specified as 'AIME', 'PRM800K', or 'both'."
 
     if meta_dataset == "AIME":
-        meta_dataset = load_dataset("FrozenWolf/Gemini-AIME-Meta")['train']
+        meta_dataset = load_data_custom("FrozenWolf/Gemini-AIME-Meta")['train']
     elif meta_dataset == "PRM800K":
         meta_dataset = data['test']
     elif meta_dataset == "both":
-        meta_dataset1 = load_dataset("FrozenWolf/Gemini-AIME-Meta")['train']
+        meta_dataset1 = load_data_custom("FrozenWolf/Gemini-AIME-Meta")['train']
         meta_dataset2 = data['test']
         df1 = meta_dataset2.to_pandas()[['prompt', 'answer', 'completions', 'correctness', 'labels']]
         df2 = meta_dataset1.to_pandas()[['prompt', 'answer', 'completions', 'correctness', 'labels']]
@@ -504,3 +504,21 @@ def build_vanilla_inference_dataloader(
 
 
     return dataloader_benchmark
+
+
+def load_data_custom(name):
+    try:
+        data = load_dataset(name)
+    except:
+        print(f"Dataset {name} not found. Loading from local path.")
+        os.system(f"git lfs install")
+        if not os.path.exists(name):
+            print(f"Cloning dataset {name} from Hugging Face.")
+            os.system(f"git clone https://huggingface.co/datasets/{name}")
+        else:
+            ### pull the latest changes
+            print(f"Pulling latest changes for dataset {name}.")
+            os.system(f"cd {name} && git pull")
+            
+        data = load_dataset(name)
+    return data

@@ -210,6 +210,40 @@ def unbatch_process(batch, device, model, max_step_size, no_grad=False, start=No
     score = torch.cat(score_list, dim=0)
     return score
 
+from collections import defaultdict
+
+def round_robin_batch_ordering(batch):
+    batch["index"] = torch.tensor(batch["index"])
+    unique_ids = batch["index"].unique(sorted=True)
+
+    # Step 1: Group indices by group_id
+    group_to_indices = defaultdict(list)
+    for idx, gid in enumerate(batch["index"].tolist()):
+        group_to_indices[gid].append(idx)
+
+    print(group_to_indices)
+    # Step 2: Interleave in round-robin
+    interleaved_indices = []
+    while any(group_to_indices.values()):
+        for gid in unique_ids.tolist():
+            if group_to_indices[gid]:
+                interleaved_indices.append(group_to_indices[gid].pop(0))
+
+    # Step 3: Reindex all tensors
+    print("Interleaved indices:", interleaved_indices, batch.keys())
+    interleaved_indices = torch.tensor(interleaved_indices)
+
+    for key in ['input_ids', 'attention_mask', 'index']:
+        batch[key] = batch[key][interleaved_indices]
+        
+    
+    reverse_indices = torch.empty_like(interleaved_indices)
+    reverse_indices[interleaved_indices] = torch.arange(len(interleaved_indices))
+
+        
+    return reverse_indices
+
+
 class DomainTable(nn.Module):
     def __init__(self, domain_to_idx):
         """
