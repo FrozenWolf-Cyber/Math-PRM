@@ -151,7 +151,7 @@ class QwenMathDataset(Dataset):
     def __len__(self):
         if SANITY_CHECK:
             print("Sanity check mode: returning 10 samples.")
-            return 10
+            return 100
         if self.special_tokens:
             return len(self.dataset)
         else:
@@ -263,7 +263,7 @@ class QwenMathMetaDataset(Dataset):
     def __len__(self):
         if SANITY_CHECK:
             print("Sanity check mode: returning 10 samples.")
-            return 10
+            return 100
         return self.len
 
     def __getitem__(self, idx):
