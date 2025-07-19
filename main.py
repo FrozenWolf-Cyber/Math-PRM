@@ -94,8 +94,8 @@ if not os.path.exists(args.weights_path):
     os.makedirs(args.weights_path)
 
 if sanity_check:
-    args.save_every_iterations = 70
-    args.iteration_num = 100
+    args.save_every_iterations = 100
+    args.iteration_num = 200
     if args.wandb_mode == "online":
         args.wandb_mode = "offline"
 
