@@ -507,7 +507,7 @@ class ReweightingEngine(Engine):
         return all_scores
 
 
-upper_config = Config(type="darts", precision=args.precision, retain_graph=True, gradient_clipping=args.gradient_clipping)
+upper_config = Config(type="darts", precision=args.precision, retain_graph=True, gradient_clipping=args.gradient_clipping, gradient_accumulation=args.gradiant_accumulation)
 lower_config = Config(type="darts", precision=args.precision, unroll_steps=args.unroll_steps, gradient_accumulation=args.gradiant_accumulation, gradient_clipping=args.gradient_clipping)
 engine_config = EngineConfig(
     train_iters=args.iteration_num,
