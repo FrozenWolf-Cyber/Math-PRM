@@ -361,6 +361,7 @@ class Lower(ImplicitProblem):
         gc.collect()
         
         if args.baseline or args.retrain:
+            loss = torch.mean(loss)  # (B, )    
             return loss
 
         loss = loss.unsqueeze(1)  # (B, 1)
