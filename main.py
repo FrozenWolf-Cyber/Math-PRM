@@ -423,23 +423,25 @@ class ReweightingEngine(Engine):
         else:
             self.lower.module.base_model.save_pretrained(f"{args.weights_path}/lower_weights")
             torch.save(self.lower.module.LN.state_dict(), f"{args.weights_path}/lower_weights_LN.pt")
-        torch.save(
-            self.upper.state_dict(),
-            f"{args.weights_path}/domain_weights.pt",
-        )
+
         
         #### log this domain weights to wandb # self.raw_weights = nn.Parameter(torch.zeros(self.num_domains))
-        wts = self.upper.module.raw_weights
-        print("Raw Weights:", wts)
-        positive_weights = torch.nn.functional.softplus(wts)
-        print("Positive Weights:", positive_weights)
-        mean_weights = positive_weights.mean()
-        wts = (positive_weights / mean_weights).cpu().numpy()
-        
-        print("Domain Weights:", wts)
-        ### separate line for each domain
-        to_log = {inv_domain_list[i]: wts[i] for i in range(len(domain_list))}
-        wandb.log(to_log)
+        if not args.baseline:
+            torch.save(
+                self.upper.state_dict(),
+                f"{args.weights_path}/domain_weights.pt",
+            )
+            wts = self.upper.module.raw_weights
+            print("Raw Weights:", wts)
+            positive_weights = torch.nn.functional.softplus(wts)
+            print("Positive Weights:", positive_weights)
+            mean_weights = positive_weights.mean()
+            wts = (positive_weights / mean_weights).cpu().numpy()
+
+            print("Domain Weights:", wts)
+            ### separate line for each domain
+            to_log = {inv_domain_list[i]: wts[i] for i in range(len(domain_list))}
+            wandb.log(to_log)
             
 
         all_scores = {}
