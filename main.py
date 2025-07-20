@@ -362,6 +362,7 @@ class Lower(ImplicitProblem):
         
         if args.baseline or args.retrain:
             loss = torch.mean(loss)  # (B, )    
+            wandb.log({"inner_loss": loss.cpu().item(),})
             return loss
 
         loss = loss.unsqueeze(1)  # (B, 1)
