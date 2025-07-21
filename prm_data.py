@@ -296,7 +296,7 @@ class QwenMathMetaDataset(Dataset):
     
     
 def build_dataloader(
-        tokenizer, train_batch_size, meta_batch_size, token_based=True, add_new_token=True, meta_dataset="AIME", filter_dataset_steps=-1, filter_dataset_token_size=-1, # "AIME" or "PRM800K"
+        tokenizer, train_batch_size, meta_batch_size, inf_batch_size=1, token_based=True, add_new_token=True, meta_dataset="AIME", filter_dataset_steps=-1, filter_dataset_token_size=-1, # "AIME" or "PRM800K"
         sanity_check=False
 ):
     
@@ -425,7 +425,7 @@ def build_dataloader(
             else:
                 dataset = QwenMathDataset(test_ds, tokenizer, special_tokens=token_based, has_subjects=False, inference=True) 
 
-            dataloader = DataLoader(dataset, batch_size=meta_batch_size, shuffle=False, collate_fn=collate_merge_minibatch)
+            dataloader = DataLoader(dataset, batch_size=inf_batch_size, shuffle=False, collate_fn=collate_merge_minibatch)
 
             dataloader_benchmark[ds][model_out] = dataloader
             next(iter(dataloader))

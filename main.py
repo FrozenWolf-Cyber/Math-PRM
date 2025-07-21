@@ -121,6 +121,7 @@ resume_labels = None
     tokenizer=tokenizer,
     train_batch_size= args.train_batch_size,
     meta_batch_size= args.meta_batch_size,
+    inf_batch_size=1,
     token_based=args.model_type == "token",
     add_new_token=args.add_new_token,
     meta_dataset=args.meta_dataset,
