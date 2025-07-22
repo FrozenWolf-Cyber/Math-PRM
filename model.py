@@ -293,7 +293,7 @@ class DomainTable(nn.Module):
     
 def get_pred(args, batch, score):
     score_cpy = score.clone()
-    correctness = batch['correctness'].int().tolist() ## (B, )
+    correctness = batch['correctness'] ## (B, )
     if args.model_type == "token":
         labels = batch['label'].to(dtype=torch.float).to("cpu")
         # score -> (B, T,)
