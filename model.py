@@ -289,3 +289,102 @@ class DomainTable(nn.Module):
         # Element-wise multiplication: each input value multiplied by its domain weight
         out = x * domain_weights
         return out
+    
+    
+def get_pred(args, batch, device, score):
+    score_cpy = score.clone()
+    correctness = batch['correctness'].int().tolist() ## (B, )
+    if args.model_type == "token":
+        labels = batch['label'].to(dtype=torch.float).to("cpu")
+        # score -> (B, T,)
+        if args.dreamprm_loss:
+            mask = (labels != -100)
+            score[mask] = 0
+            score = score / (1 - score)
+            score[mask] = 1
+            score = torch.log(score)
+            score = score * mask.float()  # (B, T)
+            mean_score = torch.mean(score, dim=1)
+            outputs = torch.sigmoid(mean_score) ## (B, )
+            
+        else:
+            # select last non -100 label
+            non_filler = (labels != -100).float()
+            reversed_non_filler = non_filler.flip(dims=[1])  # (B, T)
+            # find index of the last non-(-100) (which is first True in the reversed tensor)
+            reversed_index = torch.argmax(reversed_non_filler.float(), dim=1)  # (B,)
+            # convert to correct index from the start
+            index = labels.size(1) - 1 - reversed_index  # (B,)
+            outputs = score[torch.arange(labels.size(0)),index]  # (B, )
+        
+        # extract score
+        gt = labels[labels != -100].int().tolist()
+        step_pred = score_cpy[labels != -100].tolist()
+
+        
+ 
+    else:
+        # score -> (B * T*(T+1)/2) So [A_0_1, A_0_2,.. B_0_1, B_0_2,...] in cummulative order
+        nproblems = set(batch['index']) # [0, 1, 2, B_Size-1]
+        score_temp = score.clone()
+        gt = []
+        step_pred = []
+        score = torch.log(score / (1 - score))
+        outputs = []
+        for i in nproblems:
+            mean_score = 0
+            step = 0
+            for j in range(len(score)):
+                if batch['index'][j] == i:
+                    mean_score += score[j]
+                    step_pred.append(score_temp[j].item())
+                    gt.append(int(batch['label'][j]))
+                    step += 1
+            mean_score /= step
+            outputs.append(mean_score)
+        outputs = torch.stack(outputs) # (B, )
+        outputs = torch.sigmoid(outputs)
+    
+    problem_pred = outputs.clone().tolist()
+    ### round of predictions to 0 or 1
+    step_pred = [1 if x >= 0.5 else 0 for x in step_pred]
+    problem_pred = [1 if x >= 0.5 else 0 for x in problem_pred]
+    print("Step pred:", step_pred)
+    print("GT:", gt)
+    print("problem_pred:", problem_pred)
+    print("Correctness:", correctness)
+    
+    ## find metric for step_pred vs gt and outputs vs correctness
+    ### Calculate TP, FP, TN, FN, ACC, F1, Precision, Recall
+
+    return outputs, {'step_pred': step_pred,
+            'gt': gt,
+            'problem_pred': problem_pred,
+            'correctness': correctness,}
+        
+import numpy as np
+
+def binary_classification_metrics(preds, labels):
+    preds = np.array(preds)
+    labels = np.array(labels)
+    
+    TP = np.sum((preds == 1) & (labels == 1))
+    TN = np.sum((preds == 0) & (labels == 0))
+    FP = np.sum((preds == 1) & (labels == 0))
+    FN = np.sum((preds == 0) & (labels == 1))
+    
+    accuracy = (TP + TN) / len(labels)
+    precision = TP / (TP + FP) if (TP + FP) > 0 else 0.0
+    recall = TP / (TP + FN) if (TP + FN) > 0 else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+
+    return {
+        "TP": TP,
+        "FP": FP,
+        "TN": TN,
+        "FN": FN,
+        "Accuracy": accuracy,
+        "Precision": precision,
+        "Recall": recall,
+        "F1": f1
+    }

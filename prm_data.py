@@ -347,7 +347,7 @@ def build_dataloader(
 
 
     data = load_data_custom("FrozenWolf/prm800k")
-    
+    validation = data['test']
 
     assert meta_dataset in ["AIME", "PRM800K", "both"], "Meta dataset must be specified as 'AIME', 'PRM800K', or 'both'."
 
@@ -429,9 +429,28 @@ def build_dataloader(
 
             dataloader_benchmark[ds][model_out] = dataloader
             next(iter(dataloader))
+            
+    dst = validation.to_pandas()
+    dst = dst.copy()
+    dst['label_len'] = dst['labels'].apply(len)  # compute length of each labels list
 
+    # pick top 8 rows per prompt based on length of labels
+    dst = dst.sort_values(['prompt', 'label_len'], ascending=[True, False])
+    dst = dst.groupby('prompt').head(4).reset_index(drop=True)
 
-    return train_dataloader, meta_dataloader, dataloader_benchmark
+    # optionally, drop the helper column
+    dst = dst.drop(columns='label_len')
+    dst.drop_columns(['__index_level_0__'], inplace=True, errors='ignore')
+    validation = HF_Dataset.from_pandas(dst)
+
+    
+    if not token_based:
+        dataset = QwenMathMetaDataset(validation, tokenizer) 
+    else:
+        dataset = QwenMathDataset(validation, tokenizer, special_tokens=token_based, has_subjects=False)
+    validation_dataloader = DataLoader(dataset, batch_size=inf_batch_size, shuffle=False, collate_fn=collate_merge_minibatch)
+
+    return train_dataloader, meta_dataloader, dataloader_benchmark, validation_dataloader
 
 
 

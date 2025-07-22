@@ -16,6 +16,7 @@ import pandas as pd
 from eval_aime import *
 import gc
 from model import round_robin_batch_ordering
+from peft import PeftModel
  
 parser = argparse.ArgumentParser(description="DreamPRM")
 parser.add_argument('--weights_path', type=str)
@@ -59,6 +60,8 @@ parser.add_argument("--gradient_clipping", type=float, default=1.0, help="Gradie
 parser.add_argument("--peft_rank", type=int, default=-1, help="Rank for PEFT, -1 for no PEFT")
 parser.add_argument("--lora_alpha", type=float, default=32.0, help="Alpha for LoRA")
 parser.add_argument("--lora_dropout", type=float, default=0.05, help="Dropout for LoRA")
+parser.add_argument("--load_path", type=str, default="", help="Path to load the model from")
+
 
 args = parser.parse_args()
 print(args)
@@ -116,7 +119,8 @@ resume_labels = None
 (
     train_dataloader,
     meta_dataloader,
-    dataloader_benchmark
+    dataloader_benchmark,
+    validation_dataloader
 ) = build_dataloader(
     tokenizer=tokenizer,
     train_batch_size= args.train_batch_size,
@@ -279,6 +283,8 @@ class Upper(ImplicitProblem):
         meta_net = DomainTable(
             domain_list
         )
+        if args.saved_path != "":
+            meta_net.load_state_dict(torch.load(f"{args.load_path}/domain_weights.pt"))
         return meta_net
 
     def configure_optimizer(self):
@@ -394,6 +400,14 @@ class Lower(ImplicitProblem):
 
     def configure_module(self):
         model = configure_module(args, device)
+        
+        if args.saved_path != "":
+            if args.peft_rank != -1:
+                model.base_model = PeftModel.from_pretrained(model, f"{args.load_path}/lower_weights")
+            else:
+                model.base_model.from_pretrained(f"{args.load_path}/lower_weights")
+            model.LN.load_state_dict(torch.load(f"{args.load_path}/lower_weights_LN.pt"))
+        
         model.base_model = model.base_model.to(device)
         model.LN = model.LN.to(device)
         print("Lower model configured with device:", model.base_model.device)
@@ -421,10 +435,11 @@ class ReweightingEngine(Engine):
     @torch.no_grad()
     def validation(self):
         if args.peft_rank != -1:
-            torch.save(self.lower.module.state_dict(), f"{args.weights_path}/lower_weights.pt")
+            self.lower.module.base_model.save_pretrained(f"{args.weights_path}/lower_weights")
         else:
             self.lower.module.base_model.save_pretrained(f"{args.weights_path}/lower_weights")
-            torch.save(self.lower.module.LN.state_dict(), f"{args.weights_path}/lower_weights_LN.pt")
+            
+        torch.save(self.lower.module.LN.state_dict(), f"{args.weights_path}/lower_weights_LN.pt")
 
         
         #### log this domain weights to wandb # self.raw_weights = nn.Parameter(torch.zeros(self.num_domains))
@@ -452,7 +467,7 @@ class ReweightingEngine(Engine):
                 print(f"Evaluating {ds_name} with {model_name}")
                 test_dataloader = dataloader_benchmark[ds_name][model_name]
                 predictions = None
-
+                
                 for batch in test_dataloader:
                     if args.max_step_size == -1:
                         max_step_size = len(batch['input_ids'])
@@ -460,37 +475,7 @@ class ReweightingEngine(Engine):
                         max_step_size = args.max_step_size
                     score = unbatch_process(batch, device, self.lower, max_step_size, no_grad=True).cpu()
       
-                    if args.model_type == "token":
-                        # score -> (B, T,)
-                        labels = batch['label'].to(dtype=torch.float).to("cpu")
-                        mask = (labels != -100)
-                        score[mask] = 0
-                        score = score / (1 - score)
-                        score[mask] = 1
-                        score = torch.log(score)
-                        score = score * mask.float()  # (B, T)
-                        mean_score = torch.mean(score, dim=1)
-                        outputs = torch.sigmoid(mean_score) ## (B, )
-
-
-                    else:
-                        # score -> (B * T*(T+1)/2) So [A_0_1, A_0_2,.. B_0_1, B_0_2,...] in cummulative order
-                        nproblems = set(batch['index']) # [0, 1, 2, B_Size-1]
-                        score = torch.log(score / (1 - score))
-                        outputs = []
-                        for i in nproblems:
-                            mean_score = 0
-                            step = 0
-                            for j in range(len(score)):
-                                if batch['index'][j] == i:
-                                    mean_score += score[j]
-                                    step += 1
-                            mean_score /= step
-
-                            outputs.append(mean_score)
-
-                        outputs = torch.stack(outputs) # (B, )
-                        outputs = torch.sigmoid(outputs)
+                    outputs, _ = get_pred(args, batch, score)
 
                     outputs = outputs.to(dtype=torch.float32)
                     if predictions is None:
@@ -506,6 +491,31 @@ class ReweightingEngine(Engine):
                 df.to_csv(f"{args.weights_path}/{ds_name}_{model_name.split('/')[-1]}_predictions.csv", index=False)
                 wandb.log({f"{ds_name}/{model_name}_score": score})
                 all_scores[f"{ds_name}_{model_name}"] = score
+                
+        
+        step_pred, gt, problem_pred, correctness = [], [], [], []
+        for batch in validation_dataloader:
+            if args.max_step_size == -1:
+                max_step_size = len(batch['input_ids'])
+            else:
+                max_step_size = args.max_step_size
+                
+            score = unbatch_process(batch, device, self.lower, max_step_size, no_grad=True).cpu()
+            outputs, metric_preds = get_pred(args, batch, score)
+            step_pred+=metric_preds['step_pred']
+            gt+=metric_preds['gt']
+            problem_pred+= metric_preds['problem_pred']
+            correctness+= metric_preds['correctness']
+
+            
+        step_metrics = binary_classification_metrics(step_pred, gt) ## dict of metrics
+        problem_metrics = binary_classification_metrics(problem_pred, correctness) ## dict of metrics
+        
+        print("Step Metrics:", step_metrics)
+        print("Problem Metrics:", problem_metrics)
+        
+        wandb.log({f"step_{k}": v for k, v in step_metrics.items()})
+        wandb.log({f"problem_{k}": v for k, v in problem_metrics.items()})
         
 
         all_scores["loss"] = 1
@@ -536,4 +546,8 @@ dependencies = {"l2u": l2u, "u2l": u2l}
 engine = ReweightingEngine(
     config=engine_config, problems=problems, dependencies=dependencies
 )
+
+if not args.sanity_check:
+    ### Initial validation results
+    engine.validation()
 engine.run()
