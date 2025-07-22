@@ -283,7 +283,7 @@ class Upper(ImplicitProblem):
         meta_net = DomainTable(
             domain_list
         )
-        if args.saved_path != "":
+        if args.load_path != "":
             meta_net.load_state_dict(torch.load(f"{args.load_path}/domain_weights.pt"))
         return meta_net
 
@@ -401,7 +401,7 @@ class Lower(ImplicitProblem):
     def configure_module(self):
         model = configure_module(args, device)
         
-        if args.saved_path != "":
+        if args.load_path != "":
             if args.peft_rank != -1:
                 model.base_model = PeftModel.from_pretrained(model, f"{args.load_path}/lower_weights")
             else:
