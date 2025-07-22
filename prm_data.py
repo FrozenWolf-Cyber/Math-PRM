@@ -433,13 +433,8 @@ def build_dataloader(
     dst = validation.to_pandas()
     dst = dst.copy()
     dst['label_len'] = dst['labels'].apply(len)  # compute length of each labels list
-
-    # pick top 8 rows per prompt based on length of labels
-    dst = dst.sort_values(['prompt', 'label_len'], ascending=[True, False])
-    dst = dst.groupby('prompt').head(4).reset_index(drop=True)
-
-    # optionally, drop the helper column
-    dst = dst.drop(columns='label_len')
+    dst = dst.groupby('subject', group_keys=False).apply(select_top_20)
+    dst = dst.drop(columns='label_len').reset_index(drop=True)
     dst.drop(['__index_level_0__'], axis=1, inplace=True, errors='ignore')
     validation = HF_Dataset.from_pandas(dst)
 
@@ -554,3 +549,28 @@ def load_data_custom(name):
             
         data = load_dataset(name.split('/')[-1])
     return data
+
+
+import pandas as pd
+def select_top_20(group):
+    # Ensure label length is available
+    group = group.copy()
+    group['label_len'] = group['labels'].apply(len)
+    
+    # Get top 10 True correctness with unique prompts
+    true_rows = (
+        group[group['correctness'] == True]
+        .sort_values('label_len', ascending=False)
+        .drop_duplicates('prompt')
+        .head(10)
+    )
+
+    # Get top 10 False correctness with unique prompts
+    false_rows = (
+        group[group['correctness'] == False]
+        .sort_values('label_len', ascending=False)
+        .drop_duplicates('prompt')
+        .head(10)
+    )
+    
+    return pd.concat([true_rows, false_rows])
