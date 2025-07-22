@@ -279,8 +279,7 @@ class QwenMathMetaDataset(Dataset):
             model_inputs = self.tokenizer(text, return_tensors="pt")
             label = torch.ones_like(model_inputs['input_ids'])
             label *= -100
-            label[-1] = torch.tensor(raw_labels[:step_idx])[-1].long()
-
+            label[:,-1] = torch.tensor(raw_labels[:step_idx])[-1].long()
             inputs.append(model_inputs['input_ids'])
             attns.append(model_inputs['attention_mask'].long())
             labels.append(label.long())

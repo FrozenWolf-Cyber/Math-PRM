@@ -337,7 +337,8 @@ def get_pred(args, batch, score):
                 if batch['index'][j] == i:
                     mean_score += score[j]
                     step_pred.append(score_temp[j].item())
-                    gt.append(int(batch['label'][j]))
+                    l = batch['label'][j]
+                    gt.append(l[l!=-100].item())
                     step += 1
             mean_score /= step
             outputs.append(mean_score)
