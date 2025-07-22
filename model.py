@@ -291,7 +291,7 @@ class DomainTable(nn.Module):
         return out
     
     
-def get_pred(args, batch, device, score):
+def get_pred(args, batch, score):
     score_cpy = score.clone()
     correctness = batch['correctness'].int().tolist() ## (B, )
     if args.model_type == "token":
