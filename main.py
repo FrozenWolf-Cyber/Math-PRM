@@ -434,6 +434,33 @@ class Lower(ImplicitProblem):
 class ReweightingEngine(Engine):
     @torch.no_grad()
     def validation(self):
+        log_dict = {}
+        step_pred, gt, problem_pred, correctness = [], [], [], []
+        for batch in validation_dataloader:
+            if args.max_step_size == -1:
+                max_step_size = len(batch['input_ids'])
+            else:
+                max_step_size = args.max_step_size
+                
+            score = unbatch_process(batch, device, self.lower, max_step_size, no_grad=True).cpu()
+            outputs, metric_preds = get_pred(args, batch, score)
+            step_pred+=metric_preds['step_pred']
+            gt+=metric_preds['gt']
+            problem_pred+= metric_preds['problem_pred']
+            correctness+= metric_preds['correctness']
+
+            
+        step_metrics = binary_classification_metrics(step_pred, gt) ## dict of metrics
+        problem_metrics = binary_classification_metrics(problem_pred, correctness) ## dict of metrics
+        
+        print("Step Metrics:", step_metrics)
+        print("Problem Metrics:", problem_metrics)
+        
+        log_dict = {f"step_{k}": v for k, v in step_metrics.items()}
+        log_dict.update({f"problem_{k}": v for k, v in problem_metrics.items()})
+        
+        
+        
         if args.peft_rank != -1:
             self.lower.module.base_model.save_pretrained(f"{args.weights_path}/lower_weights")
         else:
@@ -489,34 +516,11 @@ class ReweightingEngine(Engine):
                 print(f"Dataset: {ds_name}, Model: {model_name}, Score: {score}")
                 df = pd.DataFrame(predictions)
                 df.to_csv(f"{args.weights_path}/{ds_name}_{model_name.split('/')[-1]}_predictions.csv", index=False)
-                wandb.log({f"{ds_name}/{model_name}_score": score})
+                log_dict.update({f"{ds_name}/{model_name}_score": score})
                 all_scores[f"{ds_name}_{model_name}"] = score
                 
-        
-        step_pred, gt, problem_pred, correctness = [], [], [], []
-        for batch in validation_dataloader:
-            if args.max_step_size == -1:
-                max_step_size = len(batch['input_ids'])
-            else:
-                max_step_size = args.max_step_size
-                
-            score = unbatch_process(batch, device, self.lower, max_step_size, no_grad=True).cpu()
-            outputs, metric_preds = get_pred(args, batch, score)
-            step_pred+=metric_preds['step_pred']
-            gt+=metric_preds['gt']
-            problem_pred+= metric_preds['problem_pred']
-            correctness+= metric_preds['correctness']
+        wandb.log(log_dict)
 
-            
-        step_metrics = binary_classification_metrics(step_pred, gt) ## dict of metrics
-        problem_metrics = binary_classification_metrics(problem_pred, correctness) ## dict of metrics
-        
-        print("Step Metrics:", step_metrics)
-        print("Problem Metrics:", problem_metrics)
-        
-        wandb.log({f"step_{k}": v for k, v in step_metrics.items()})
-        wandb.log({f"problem_{k}": v for k, v in problem_metrics.items()})
-        
 
         all_scores["loss"] = 1
         return all_scores
