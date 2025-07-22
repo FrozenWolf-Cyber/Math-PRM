@@ -440,7 +440,7 @@ def build_dataloader(
 
     # optionally, drop the helper column
     dst = dst.drop(columns='label_len')
-    dst.drop_columns(['__index_level_0__'], inplace=True, errors='ignore')
+    dst.drop(['__index_level_0__'], axis=1, inplace=True, errors='ignore')
     validation = HF_Dataset.from_pandas(dst)
 
     
