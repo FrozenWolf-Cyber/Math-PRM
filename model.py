@@ -349,10 +349,7 @@ def get_pred(args, batch, score):
     ### round of predictions to 0 or 1
     step_pred = [1 if x >= 0.5 else 0 for x in step_pred]
     problem_pred = [1 if x >= 0.5 else 0 for x in problem_pred]
-    print("Step pred:", step_pred)
-    print("GT:", gt)
-    print("problem_pred:", problem_pred)
-    print("Correctness:", correctness)
+
     
     ## find metric for step_pred vs gt and outputs vs correctness
     ### Calculate TP, FP, TN, FN, ACC, F1, Precision, Recall
