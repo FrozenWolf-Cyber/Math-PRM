@@ -3,6 +3,7 @@ import torch.nn.functional as F
 import torch
 import torch.nn as nn
 import gc
+from tqdm.auto import tqdm
 from peft import LoraConfig, TaskType, get_peft_model
 DEBUG = True
 # # Define LoRA configuration
@@ -197,8 +198,7 @@ def unbatch_process(batch, device, model, max_step_size, no_grad=False, start=No
         end = len(batch['input_ids'])
     
     score_list = []
-    for idx in range(start, end, max_step_size):
-        print(f"Processing batch from {idx} to {min(end, idx + max_step_size)}")
+    for idx in tqdm(range(start, end, max_step_size), desc=f"Processing batch from {start} to {end} with max step size {max_step_size}"):
         input_ids = batch['input_ids'][idx:min(end, idx + max_step_size)].to(device)
         attn_mask = batch['attention_mask'][idx:min(end,idx + max_step_size)].to(device)
         score = model(input_ids.to(device),
