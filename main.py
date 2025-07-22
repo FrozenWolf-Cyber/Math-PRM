@@ -436,7 +436,7 @@ class ReweightingEngine(Engine):
     def validation(self):
         log_dict = {}
         step_pred, gt, problem_pred, correctness = [], [], [], []
-        for batch in validation_dataloader:
+        for batch in tqdm(validation_dataloader):
             if args.max_step_size == -1:
                 max_step_size = len(batch['input_ids'])
             else:
