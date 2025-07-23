@@ -99,7 +99,7 @@ for questions, solutions, step_labels, correctness in tqdm(zip(
     dst_selected['completions'].tolist(),
     dst_selected['labels'].tolist(),
     dst_selected['correctness'].tolist()
-)):
+), total=len(dst_selected)):
     step_rewards = evaluate_question_stepwise(
         model=model,
         tokenizer=tokenizer,

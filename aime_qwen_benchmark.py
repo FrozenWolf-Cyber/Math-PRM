@@ -124,7 +124,7 @@ for ds in os.listdir(paths):
         output["subject"] = "Others" ## filler values
         
         all_problem_pred = []
-        for questions, solutions in tqdm(zip(output['problem'].tolist(), output['completions'].tolist())):
+        for questions, solutions in tqdm(zip(output['problem'].tolist(), output['completions'].tolist()), total=len(output)):
             step_rewards = evaluate_question_stepwise(
                 model=model,
                 tokenizer=tokenizer,
