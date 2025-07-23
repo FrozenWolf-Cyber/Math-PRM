@@ -12,6 +12,7 @@ import pickle
 tqdm.pandas()
 
 SANITY_CHECK = False
+OVERFIT = -1
 
 subjects_map = {'Algebra':0,
  'Counting & Probability':1,
@@ -149,6 +150,10 @@ class QwenMathDataset(Dataset):
         self.index_map[1], self.index_map[max_len_idx] = self.index_map[max_len_idx], self.index_map[1]
 
     def __len__(self):
+        if OVERFIT > 0:
+            print(f"Overfitting mode: returning {OVERFIT} samples.")
+            return OVERFIT
+        
         if SANITY_CHECK:
             print("Sanity check mode: returning 10 samples.")
             return 100
@@ -261,6 +266,9 @@ class QwenMathMetaDataset(Dataset):
                     
 
     def __len__(self):
+        if OVERFIT > 0:
+            print(f"Overfitting mode: returning {OVERFIT} samples.")
+            return OVERFIT
         if SANITY_CHECK:
             print("Sanity check mode: returning 10 samples.")
             return 100
@@ -296,7 +304,7 @@ class QwenMathMetaDataset(Dataset):
     
 def build_dataloader(
         tokenizer, train_batch_size, meta_batch_size, inf_batch_size=1, token_based=True, add_new_token=True, meta_dataset="AIME", filter_dataset_steps=-1, filter_dataset_token_size=-1, # "AIME" or "PRM800K"
-        sanity_check=False
+        sanity_check=False, overfit=-1,
 ):
     
     if not add_new_token:
@@ -308,6 +316,11 @@ def build_dataloader(
     if sanity_check:
         global SANITY_CHECK
         SANITY_CHECK = True
+    if overfit > 0:
+        print(f"Overfitting to {overfit} samples.")
+        global OVERFIT
+        OVERFIT = overfit
+        
 
     def collate_merge_minibatch(batch):
         if len(batch[0]) == 6:

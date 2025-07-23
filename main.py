@@ -46,6 +46,7 @@ parser.add_argument("--dreamprm_loss", action="store_true")
 parser.add_argument("--model_type", type=str, default="token")
 parser.add_argument("--meta_dataset", type=str, default="AIME", help="AIME or PRM800K or both")
 parser.add_argument("--sanity_check", action="store_true")
+parser.add_argument("--overfit", type=int, default=-1)
 parser.add_argument("--add_new_token",  action="store_true", help="Whether to add new token <PRM_STEP_SCORE> to the tokenizer")
 parser.add_argument("--freeze_till_last",  action="store_true", help="Freeze till last layer")
 parser.add_argument("--freeze_tokens",  action="store_true", help="Freeze other than newly added tokens")
@@ -132,6 +133,7 @@ resume_labels = None
     sanity_check=sanity_check,
     filter_dataset_steps=args.filter_dataset_steps,
     filter_dataset_token_size=args.filter_dataset_token_size
+    overfit = args.overfit,
 )
 
 
