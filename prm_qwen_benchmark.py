@@ -1,0 +1,131 @@
+from datasets import load_dataset, load_from_disk
+from tqdm.auto import tqdm
+ds = load_from_disk("../PRM800k_cleaned")
+dst = ds['test'].to_pandas()
+
+
+import pandas as pd
+def select_top_20(group):
+    # Ensure label length is available
+    group = group.copy()
+    group['label_len'] = group['labels'].apply(len)
+    
+    # Get top 10 True correctness with unique prompts
+    true_rows = (
+        group[group['correctness'] == True]
+        .sort_values('label_len', ascending=False)
+        .drop_duplicates('prompt')
+        .head(10)
+    )
+
+    # Get top 10 False correctness with unique prompts
+    false_rows = (
+        group[group['correctness'] == False]
+        .sort_values('label_len', ascending=False)
+        .drop_duplicates('prompt')
+        .head(10)
+    )
+    
+    return pd.concat([true_rows, false_rows])
+
+# Apply this for each subject
+dst_selected = dst.groupby('subject', group_keys=False).apply(select_top_20)
+
+# Optional cleanup
+dst_selected = dst_selected.drop(columns='label_len').reset_index(drop=True)
+
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+import torch.nn.functional as F
+
+
+def make_step_rewards(logits, token_masks):
+    probabilities = F.softmax(logits, dim=-1)
+    probabilities = probabilities * token_masks.unsqueeze(-1)  # bs, seq_len, num_labels
+
+    all_scores_res = []
+    for i in range(probabilities.size(0)):
+        sample = probabilities[i]  # seq_len, num_labels
+        positive_probs = sample[sample != 0].view(-1, 2)[:, 1]  # get p(label=1)
+        all_scores_res.append(positive_probs.cpu().tolist())
+    return all_scores_res
+
+
+def evaluate_question_stepwise(model, tokenizer, system_prompt, question, stepwise_solution):
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": question},
+        {"role": "assistant", "content": "<extra_0>".join(stepwise_solution) + "<extra_0>"},
+    ]
+    conversation_str = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=False
+    )
+    
+    # print("Conversation String:", conversation_str)
+    
+    input_ids = tokenizer.encode(
+        conversation_str,
+        return_tensors="pt"
+    ).to(model.device)
+
+    step_sep_id = tokenizer.encode("<extra_0>")[0]
+    token_masks = (input_ids == step_sep_id)
+
+    with torch.no_grad():
+        outputs = model(input_ids=input_ids)
+        step_rewards = make_step_rewards(outputs[0], token_masks)
+
+    return step_rewards[0]
+
+
+model_name = "Qwen/Qwen2.5-Math-PRM-7B"
+tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+model = AutoModel.from_pretrained(
+    model_name,
+    device_map="auto",
+    torch_dtype=torch.bfloat16,
+    trust_remote_code=True
+).eval()
+
+history = []
+all_step_pred, all_step_labels, all_problem_correctness, all_problem_pred = [], [], [], []
+for questions, solutions, step_labels, correctness in tqdm(zip(
+    dst_selected['prompt'].tolist(),
+    dst_selected['completions'].tolist(),
+    dst_selected['labels'].tolist(),
+    dst_selected['correctness'].tolist()
+)):
+    step_rewards = evaluate_question_stepwise(
+        model=model,
+        tokenizer=tokenizer,
+        system_prompt="Please reason step by step, and put your final answer within \\boxed{}.",
+        question=questions,
+        stepwise_solution=solutions
+    )
+    history.append({
+		'question': questions,
+		'solutions': solutions,
+		'step_rewards': step_rewards,
+		'step_labels': step_labels,
+		'correctness': correctness
+	})
+    all_step_pred+= [1 if i>=0.5 else 0 for i in step_rewards]
+    all_step_labels+= [1 if i else 0 for i in step_labels.tolist()]
+    all_problem_correctness+=[correctness]
+    a = step_rewards[-1]
+    all_problem_pred+=[1 if a>=0.5 else 0]
+    
+    
+from model import binary_classification_metrics
+step_metrics = binary_classification_metrics(all_step_pred, all_step_labels)
+problem_metric = binary_classification_metrics(all_problem_pred, all_problem_correctness)
+
+print("Step-wise Metrics:", step_metrics)
+print("Problem-wise Metrics:", problem_metric)
+
+
+import pickle
+pickle.dump(history, open("qwen_benchmark_history.pkl", "wb"))
