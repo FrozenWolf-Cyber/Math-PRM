@@ -559,7 +559,7 @@ engine = ReweightingEngine(
 
 print("Overfit value:", args.overfit)
 print("Sanity check value:", args.sanity_check)
-if (not args.sanity_check) and (args.overfit!=-1):
+if (not args.sanity_check) and (args.overfit==-1):
     ### Initial validation results
     engine.validation()
 else:
