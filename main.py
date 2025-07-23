@@ -132,7 +132,7 @@ resume_labels = None
     meta_dataset=args.meta_dataset,
     sanity_check=sanity_check,
     filter_dataset_steps=args.filter_dataset_steps,
-    filter_dataset_token_size=args.filter_dataset_token_size
+    filter_dataset_token_size=args.filter_dataset_token_size,
     overfit = args.overfit,
 )
 
