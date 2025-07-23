@@ -9,7 +9,7 @@ from betty.engine import Engine
 from betty.problems import ImplicitProblem
 from betty.configs import Config, EngineConfig
 import wandb
-from transformers import AdamW
+from torch.optim import AdamW
 import numpy as np
 from copy import deepcopy
 import pandas as pd
