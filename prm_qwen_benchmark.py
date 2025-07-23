@@ -1,6 +1,8 @@
 from datasets import load_dataset, load_from_disk
+from prm_data import load_data_custom
 from tqdm.auto import tqdm
-ds = load_from_disk("../PRM800k_cleaned")
+# ds = load_from_disk("../PRM800k_cleaned")
+ds = load_data_custom("FrozenWolf/prm800k")
 dst = ds['test'].to_pandas()
 
 
