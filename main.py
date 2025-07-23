@@ -102,6 +102,10 @@ if sanity_check:
     args.iteration_num = 200
     if args.wandb_mode == "online":
         args.wandb_mode = "offline"
+      
+inner_log_every = 100  
+if args.overfit != -1:
+    inner_log_every = 1
 
 
 tokenizer = AutoTokenizer.from_pretrained(args.reward_model, trust_remote_code=True)
@@ -386,7 +390,7 @@ class Lower(ImplicitProblem):
         
         lower_loss.append(torch.mean(loss).item())
         lower_weighted_loss.append(torch.mean(weighted_loss).item())
-        if len(lower_loss) == 100:
+        if len(lower_loss) == inner_log_every:
             mean_inner_loss = np.mean(lower_loss)
             mean_inner_weighted_loss = np.mean(lower_weighted_loss)
             wandb.log({"inner_loss": mean_inner_loss,
@@ -558,4 +562,6 @@ print("Sanity check value:", args.sanity_check)
 if (not args.sanity_check) and (args.overfit!=-1):
     ### Initial validation results
     engine.validation()
+else:
+    print("Skipping initial validation for sanity check or overfit mode")
 engine.run()
