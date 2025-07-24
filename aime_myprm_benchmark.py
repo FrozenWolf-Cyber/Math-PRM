@@ -58,15 +58,14 @@ def forward(model, tokenizer, question, stepwise_solution, special_tokens, add_n
     # print("Conversation String:", conversation_str)
     
     model_inputs = tokenizer([conversation_str], return_tensors="pt")
-    if "7B" in args.reward_model:
-        model_inputs['input_ids'] = model_inputs['input_ids'][:, :2300]
-        model_inputs['attention_mask'] = model_inputs['attention_mask'][:, :2300]
     if SEP_TOKEN == '<PRM_STEP_SCORE>':
         SEP = len(tokenizer)-1
     else:
         SEP = tokenizer(SEP_TOKEN)['input_ids'][0]
             
     if special_tokens:
+        model_inputs['input_ids'] = model_inputs['input_ids'][:, :2500]
+        model_inputs['attention_mask'] = model_inputs['attention_mask'][:, :2500]
         token_masks = torch.ones_like(model_inputs['input_ids']).long()
         token_masks[(model_inputs['input_ids']!=SEP)] = 0
     else:
