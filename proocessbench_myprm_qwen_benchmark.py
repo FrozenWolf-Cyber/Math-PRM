@@ -66,7 +66,6 @@ def forward(model, tokenizer, question, stepwise_solution, special_tokens, add_n
     if SEP_TOKEN == '<PRM_STEP_SCORE>':
         SEP = len(tokenizer)-1
     else:
-        print("Separator token is:", SEP_TOKEN, tokenizer(SEP_TOKEN))
         SEP = tokenizer(SEP_TOKEN)['input_ids'][0]
             
     if special_tokens:
