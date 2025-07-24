@@ -59,8 +59,8 @@ def forward(model, tokenizer, question, stepwise_solution, special_tokens, add_n
     
     model_inputs = tokenizer([conversation_str], return_tensors="pt")
     if "7B" in args.reward_model:
-        model_inputs['input_ids'] = model_inputs['input_ids'][:, :3000]
-        model_inputs['attention_mask'] = model_inputs['attention_mask'][:, :3000]
+        model_inputs['input_ids'] = model_inputs['input_ids'][:, :2700]
+        model_inputs['attention_mask'] = model_inputs['attention_mask'][:, :2700]
     if SEP_TOKEN == '<PRM_STEP_SCORE>':
         SEP = len(tokenizer)-1
     else:
