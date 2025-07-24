@@ -174,7 +174,7 @@ for ds in os.listdir(paths):
         idx = 0
         for questions, solutions in tqdm(zip(output['problem'].tolist(), output['completions'].tolist()), total=len(output)):
             idx+=1
-            if id!=19:
+            if idx!=19:
                 continue
             print(f"Processing {idx}/{len(output)}")
             if special_tokens:
