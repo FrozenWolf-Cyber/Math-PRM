@@ -168,7 +168,6 @@ for dataset in process_benchmark:
             score = torch.log(score / (1 - score))
             score = score.sum()
             score = torch.sigmoid(score)
-            print("Score:", score)
         
 
         all_problem_correctness+=[correctness]

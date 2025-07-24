@@ -1,44 +1,8 @@
 from datasets import load_dataset, load_from_disk
 from prm_data import load_data_custom
 from tqdm.auto import tqdm
-
-device = "cuda" 
 # ds = load_from_disk("../PRM800k_cleaned")
-ds = load_data_custom("FrozenWolf/prm800k")
-dst = ds['test'].to_pandas()
-
-
-import pandas as pd
-def select_top_20(group):
-    # Ensure label length is available
-    group = group.copy()
-    group['label_len'] = group['labels'].apply(len)
-    
-    # Get top 10 True correctness with unique prompts
-    true_rows = (
-        group[group['correctness'] == True]
-        .sort_values('label_len', ascending=False)
-        .drop_duplicates('prompt')
-        .head(10)
-    )
-
-    # Get top 10 False correctness with unique prompts
-    false_rows = (
-        group[group['correctness'] == False]
-        .sort_values('label_len', ascending=False)
-        .drop_duplicates('prompt')
-        .head(10)
-    )
-    
-    return pd.concat([true_rows, false_rows])
-
-# Apply this for each subject
-dst_selected = dst.groupby('subject', group_keys=False).apply(select_top_20)
-
-# Optional cleanup
-dst_selected = dst_selected.drop(columns='label_len').reset_index(drop=True)
-
-
+device = "cuda" 
 import torch
 from transformers import AutoModel, AutoTokenizer
 import torch.nn.functional as F
@@ -164,63 +128,75 @@ if args.load_path != "":
 special_tokens, add_new_token = args.special_tokens, args.add_new_token
 
 
-history = []
-all_step_pred, all_step_labels, all_problem_correctness, all_problem_pred = [], [], [], []
-for questions, solutions, step_labels, correctness in tqdm(zip(
-    dst_selected['prompt'].tolist(),
-    dst_selected['completions'].tolist(),
-    dst_selected['labels'].tolist(),
-    dst_selected['correctness'].tolist()
-), total=len(dst_selected)):
+
+import os
+import pandas as pd
+from eval_aime import eval
+paths = "aime_outputs/"
     
-    if special_tokens:
-        step_rewards, token_masks = forward(
-        model=model,
-        tokenizer=tokenizer,
-        question=questions,
-        stepwise_solution=solutions,
-        special_tokens=True,
-        add_new_token=add_new_token
-        )
-        step_rewards = make_step_rewards(step_rewards, token_masks)[0]
-    else:
-        step_rewards = forward_no_tokens(
-            model=model,
-            tokenizer=tokenizer,
-            question=questions,
-            stepwise_solution=solutions,
-            add_new_token=add_new_token
-        )
+dataloader_benchmark = {}
+prediction_history = {}
+for ds in os.listdir(paths):
+    dataloader_benchmark[ds] = {}
+    ds_ = os.path.join(paths, ds)
+    prediction_history[ds] = {}
+    
+    for model_out in os.listdir(ds_):
+        model_out = os.path.join(ds_, model_out)
+        path = os.listdir(model_out)[0]
+        path = os.path.join(model_out, path)
+        output = pd.read_json(path_or_buf=path, lines=True)
+        print(f"Loading {path} with {len(output)} samples")
+        output["index"] = output.index
+        output = output.explode(["generated_responses", "answers_correctness"]).reset_index(drop=True)
+        # sep = "\n" if "o4" in model_out else "\n\n"
+        sep = "\n\n"
+        output["generated_responses"] = output["generated_responses"].apply(lambda x: x.split(sep))
+        output.rename(columns={"generated_responses": "completions"}, inplace=True)
+        output["labels"] = [
+                    [val] * len(completions)
+                    for val, completions in zip(output["answers_correctness"], output["completions"])
+                ]
+        output["subject"] = "Others" ## filler values
         
-        score = torch.tensor(step_rewards)
-        score = torch.log(score / (1 - score))
-        score = score.sum()
-        score = torch.sigmoid(score)
+        all_problem_pred = []
+        for questions, solutions in tqdm(zip(output['problem'].tolist(), output['completions'].tolist()), total=len(output)):
+            if special_tokens:
+                step_rewards, token_masks = forward(
+                model=model,
+                tokenizer=tokenizer,
+                question=questions,
+                stepwise_solution=solutions,
+                special_tokens=True,
+                add_new_token=add_new_token
+                )
+                step_rewards = make_step_rewards(step_rewards, token_masks)[0]
+            else:
+                step_rewards = forward_no_tokens(
+                    model=model,
+                    tokenizer=tokenizer,
+                    question=questions,
+                    stepwise_solution=solutions,
+                    add_new_token=add_new_token
+                )
+
+                score = torch.tensor(step_rewards)
+                score = torch.log(score / (1 - score))
+                score = score.sum()
+                score = torch.sigmoid(score)
+
+
+            if special_tokens:
+                a = step_rewards[-1]
+            else:
+                a = score
+            all_problem_pred+=[1 if a>=0.5 else 0]
+            
+        predictions, score = eval(output, all_problem_pred, ds)
+        print(f"Model {model_out} on dataset {ds} has score {score}")
+        prediction_history[ds][model_out] = predictions
         
-    history.append({
-		'question': questions,
-		'solutions': solutions,
-		'step_rewards': step_rewards,
-		'step_labels': step_labels,
-		'correctness': correctness
-	})
-    all_step_pred+= [1 if i>=0.5 else 0 for i in step_rewards]
-    all_step_labels+= [1 if i else 0 for i in step_labels.tolist()]
-    all_problem_correctness+=[correctness]
-    if special_tokens:
-        a = step_rewards[-1]
-    else:
-        a = score
-    all_problem_pred+=[1 if a>=0.5 else 0]
-    
-    
-from model import binary_classification_metrics
-step_metrics = binary_classification_metrics(all_step_pred, all_step_labels)
-problem_metric = binary_classification_metrics(all_problem_pred, all_problem_correctness)
-
-print("Step-wise Metrics:", step_metrics)
-print("Problem-wise Metrics:", problem_metric)
-
-
+        
 import pickle
-pickle.dump(history, open("my_qwen_benchmark_history.pkl", "wb"))
+with open("myprm_aime_prediction_history.pkl", "wb") as f:
+    pickle.dump(prediction_history, f)
