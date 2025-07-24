@@ -57,7 +57,7 @@ def forward(model, tokenizer, question, stepwise_solution, special_tokens, add_n
         
     # print("Conversation String:", conversation_str)
     
-    model_inputs = tokenizer([conversation_str], return_tensors="pt", max_length=2700, truncation=True)
+    model_inputs = tokenizer([conversation_str], return_tensors="pt", max_length=3000, truncation=True, padding='max_length')
     if SEP_TOKEN == '<PRM_STEP_SCORE>':
         SEP = len(tokenizer)-1
     else:
