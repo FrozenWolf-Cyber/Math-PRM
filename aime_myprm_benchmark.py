@@ -155,6 +155,8 @@ for ds in os.listdir(paths):
         path = os.listdir(model_out)[0]
         path = os.path.join(model_out, path)
         output = pd.read_json(path_or_buf=path, lines=True)
+        if path!="aime_outputs/test2025-I/gemini/Gemini_AIME_Dataset_2024_25_I.jsonl":
+            continue
         print(f"Loading {path} with {len(output)} samples")
         output["index"] = output.index
         output = output.explode(["generated_responses", "answers_correctness"]).reset_index(drop=True)
