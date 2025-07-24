@@ -6,6 +6,7 @@ device = "cuda"
 import torch
 from transformers import AutoModel, AutoTokenizer
 import torch.nn.functional as F
+import gc
 SEP_TOKEN = '<PRM_STEP_SCORE>'
 
 def chat_template( question, steps):
@@ -42,7 +43,7 @@ def make_step_rewards(logits, token_masks):
         all_scores_res.append(positive_probs.cpu().tolist())
     return all_scores_res
 
-
+@torch.no_grad()
 def forward(model, tokenizer, question, stepwise_solution, special_tokens, add_new_token):
     if not add_new_token:
         assert '<|im_end|>' in tokenizer.special_tokens_map['additional_special_tokens'], "Please check if <|im_end|> token to the tokenizer vocab."
@@ -74,14 +75,20 @@ def forward(model, tokenizer, question, stepwise_solution, special_tokens, add_n
         outputs = model(input_ids=model_inputs['input_ids'].to(device),
                         attention_mask=model_inputs['attention_mask'].to(device))
         
-
+    del model_inputs
+    gc.collect()
+    torch.cuda.empty_cache()
     return outputs, token_masks
 
+@torch.no_grad()
 def forward_no_tokens(model, tokenizer, question, stepwise_solution, add_new_token=False):
     step_score = []
     for i in range(1,len(stepwise_solution)+1):
         output, _ = forward(model, tokenizer, question, stepwise_solution[:i], special_tokens=False, add_new_token=add_new_token)
         step_score.append(output.item())
+        del output
+        gc.collect()
+        torch.cuda.empty_cache()
     return step_score
         
 
