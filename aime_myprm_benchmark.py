@@ -171,7 +171,10 @@ for ds in os.listdir(paths):
         output["subject"] = "Others" ## filler values
         
         all_problem_pred = []
+        idx = 0
         for questions, solutions in tqdm(zip(output['problem'].tolist(), output['completions'].tolist()), total=len(output)):
+            idx+=1
+            print(f"Processing {idx}/{len(output)}")
             if special_tokens:
                 step_rewards, token_masks = forward(
                 model=model,
