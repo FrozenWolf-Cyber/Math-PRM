@@ -73,12 +73,15 @@ def forward(model, tokenizer, question, stepwise_solution, special_tokens, add_n
             
     with torch.no_grad():
         outputs = model(input_ids=model_inputs['input_ids'].to(device),
-                        attention_mask=model_inputs['attention_mask'].to(device))
+                        attention_mask=model_inputs['attention_mask'].to(device)).cpu()
+        
+        output = outputs.clone()
+        del outputs
         
     del model_inputs
     gc.collect()
     torch.cuda.empty_cache()
-    return outputs, token_masks
+    return output, token_masks
 
 @torch.no_grad()
 def forward_no_tokens(model, tokenizer, question, stepwise_solution, add_new_token=False):
