@@ -2,3 +2,4 @@ __pycache__
 wandb
 weights
 *.pkl
+prm800k

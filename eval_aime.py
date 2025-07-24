@@ -27,7 +27,6 @@ def parse_list(arg):
 
 
 def eval(dataset, predictions, ds_name):
-
     selected_responses = []
     curr_index = -1
     best_score = -10000
@@ -73,7 +72,7 @@ def infer(file_outputs, data_name = "aime", split = "test", data_dir = "./", sta
     for i in range(len(file_outputs)):
         d = examples[i]
         gt_cot, gt_ans = parse_ground_truth(d, data_name)
-        generated_responses = file_outputs[i]['generated_responses']
+        generated_responses = ['\n'.join(file_outputs[i]['generated_responses'])]
         generated_answers = [extract_answer(generated_response, data_name) for generated_response in generated_responses]
         majorty_voting = get_majority_voting(generated_answers)
         is_correct_list = [check_is_correct(generated_answer, gt_ans) for generated_answer in generated_answers]

@@ -62,7 +62,7 @@ parser.add_argument("--peft_rank", type=int, default=-1, help="Rank for PEFT, -1
 parser.add_argument("--lora_alpha", type=float, default=32.0, help="Alpha for LoRA")
 parser.add_argument("--lora_dropout", type=float, default=0.05, help="Dropout for LoRA")
 parser.add_argument("--load_path", type=str, default="", help="Path to load the model from")
-
+parser.add_argument("--evaluate_only", action="store_true")
 
 args = parser.parse_args()
 print(args)
@@ -559,9 +559,13 @@ engine = ReweightingEngine(
 
 print("Overfit value:", args.overfit)
 print("Sanity check value:", args.sanity_check)
-if (not args.sanity_check) and (args.overfit==-1):
-    ### Initial validation results
+
+if args.evaluate_only:
     engine.validation()
 else:
-    print("Skipping initial validation for sanity check or overfit mode")
-engine.run()
+    if (not args.sanity_check) and (args.overfit==-1):
+        ### Initial validation results
+        engine.validation()
+    else:
+        print("Skipping initial validation for sanity check or overfit mode")
+    engine.run()
