@@ -64,8 +64,8 @@ def forward(model, tokenizer, question, stepwise_solution, special_tokens, add_n
         SEP = tokenizer(SEP_TOKEN)['input_ids'][0]
             
     if special_tokens:
-        model_inputs['input_ids'] = model_inputs['input_ids'][:, :2500]
-        model_inputs['attention_mask'] = model_inputs['attention_mask'][:, :2500]
+        model_inputs['input_ids'] = model_inputs['input_ids'][:, :3000]
+        model_inputs['attention_mask'] = model_inputs['attention_mask'][:, :3000]
         token_masks = torch.ones_like(model_inputs['input_ids']).long()
         token_masks[(model_inputs['input_ids']!=SEP)] = 0
     else:
