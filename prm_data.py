@@ -308,7 +308,6 @@ def build_dataloader(
 ):
     
     if not add_new_token:
-        print(tokenizer.special_tokens_map['additional_special_tokens'])
         assert '<|im_end|>' in tokenizer.special_tokens_map['additional_special_tokens'], "Please check if <|im_end|> token to the tokenizer vocab."
         global SEP_TOKEN
         SEP_TOKEN = '<|im_end|>'
