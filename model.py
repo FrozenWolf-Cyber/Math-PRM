@@ -129,12 +129,11 @@ class QwenMathCondGen_RM(nn.Module):
         return value_outputs.squeeze(dim=1)
     
 def configure_module(args, device):
-    print("Configuring model with the following arguments:", args.model_type)
     if args.model_type == "token":
         model = QwenMathTokenClf_RM(device, args)
     else:
         model = QwenMathCondGen_RM(device, args)
-    print("Model type:", args.model_type)
+        
     if args.peft_rank != -1:
             peft_config = LoraConfig(
             task_type=TaskType.TOKEN_CLS if args.model_type == "token" else TaskType.CAUSAL_LM,
@@ -148,8 +147,7 @@ def configure_module(args, device):
             print(peft_config)
             print("Trainable parameters in PEFT model:", model.base_model.print_trainable_parameters())
             print("LN parameters:", sum(p.numel() for p in model.LN.parameters() if p.requires_grad))
-    
-    print("Model loaded successfully from:", args.reward_model) 
+            
     if args.freeze_till_last:
         for param in model.base_model.parameters():
             param.requires_grad = False
@@ -158,6 +156,7 @@ def configure_module(args, device):
             print("Unfreezing newly addded token")
             model.base_model.model.embed_tokens.weight[-1].requires_grad = True
             
+        
     if args.freeze_tokens:
         print("Freezing all embeddings")
         model.base_model.model.embed_tokens.requires_grad = False
@@ -165,7 +164,8 @@ def configure_module(args, device):
             print("Freezing all embeddings except the newly added token")
             model.base_model.model.embed_tokens.weight[-1].requires_grad = True
             
-    print("Debug 1")
+        
+        
     model.to(device)
     if args.freeze_all_but_bias:
         for param in model.parameters():
