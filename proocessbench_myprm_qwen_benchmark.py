@@ -119,7 +119,7 @@ if args.add_new_token:
 
 
 model = configure_module(args, device)
-
+print("Model loaded successfully")
 if args.load_path != "":
     if args.peft_rank != -1:
         model.base_model = PeftModel.from_pretrained(model, f"{args.load_path}/lower_weights")
@@ -132,7 +132,7 @@ special_tokens, add_new_token = args.special_tokens, args.add_new_token
 
 from model import binary_classification_metrics
 
-
+print("Starting evaluation...")
 history = {}
 for dataset in process_benchmark:
     history[dataset] = {}
