@@ -105,9 +105,7 @@ def forward(model, tokenizer, question, stepwise_solution, special_tokens, add_n
         output = outputs.clone()
         del outputs
         
-    del model_inputs
-    gc.collect()
-    torch.cuda.empty_cache()
+
     return output, token_masks
 
 @torch.no_grad()
@@ -116,9 +114,6 @@ def forward_no_tokens(model, tokenizer, question, stepwise_solution, add_new_tok
     for i in range(1,len(stepwise_solution)+1):
         output, _ = forward(model, tokenizer, question, stepwise_solution[:i], special_tokens=False, add_new_token=add_new_token)
         step_score.append(output.item())
-        del output
-        gc.collect()
-        torch.cuda.empty_cache()
     return step_score
         
 
