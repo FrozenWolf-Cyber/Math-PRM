@@ -1,6 +1,24 @@
 #!/bin/bash
 
 {
+	# qwen2.5-7B_token_acc16_baseline_lr1e-4_dropout0
+echo "Running: qwen2.5-7B_token_acc16_baseline_lr1e-4_dropout0"
+python aime_myprm_benchmark.py --load_path weights/elated-cosmos-198 --peft_rank 16 --lora_dropout 0 --special_tokens --add_new_token --model_type token --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
+sleep 2
+python myprm_qwen_benchmark.py --load_path weights/elated-cosmos-198 --peft_rank 16 --lora_dropout 0 --special_tokens --add_new_token --model_type token --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
+sleep 2
+python proocessbench_myprm_qwen_benchmark.py --load_path weights/elated-cosmos-198 --peft_rank 16 --lora_dropout 0 --special_tokens --add_new_token --model_type token --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
+sleep 2
+
+# qwen2.5-7B_clf_acc8_baseline_lr1e-4_dropout0
+echo "Running: qwen2.5-7B_clf_acc8_baseline_lr1e-4_dropout0"
+python aime_myprm_benchmark.py --load_path weights/tough-moon-199 --peft_rank 16 --lora_dropout 0 --special_tokens --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
+sleep 2
+python myprm_qwen_benchmark.py --load_path weights/tough-moon-199 --peft_rank 16 --lora_dropout 0 --special_tokens --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
+sleep 2
+python proocessbench_myprm_qwen_benchmark.py --load_path weights/tough-moon-199 --peft_rank 16 --lora_dropout 0 --special_tokens --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
+sleep 2
+
 # echo "Running: proocessbench_myprm_qwen_benchmark.py | token | Qwen2.5"
 # python proocessbench_myprm_qwen_benchmark.py --load_path "" --special_tokens --model_type token --reward_model Qwen/Qwen2.5-Math-7B-Instruct
 # sleep 5
@@ -28,14 +46,14 @@
 # echo "Running: proocessbench_myprm_qwen_benchmark.py | token | Qwen3"
 # python proocessbench_myprm_qwen_benchmark.py --load_path "" --special_tokens --model_type token --reward_model Qwen/Qwen3-8B
 # sleep 5
-echo "Running: aime_myprm_benchmark.py | clf | Qwen3"
-python aime_myprm_benchmark.py --load_path "" --model_type clf --reward_model Qwen/Qwen3-8B
-sleep 5
-echo "Running: myprm_qwen_benchmark.py | clf | Qwen3"
-python myprm_qwen_benchmark.py --load_path "" --model_type clf --reward_model Qwen/Qwen3-8B
-sleep 5
-echo "Running: proocessbench_myprm_qwen_benchmark.py | clf | Qwen3"
-python proocessbench_myprm_qwen_benchmark.py --load_path "" --model_type clf --reward_model Qwen/Qwen3-8B
+# echo "Running: aime_myprm_benchmark.py | clf | Qwen3"
+# python aime_myprm_benchmark.py --load_path "" --model_type clf --reward_model Qwen/Qwen3-8B
+# sleep 5
+# echo "Running: myprm_qwen_benchmark.py | clf | Qwen3"
+# python myprm_qwen_benchmark.py --load_path "" --model_type clf --reward_model Qwen/Qwen3-8B
+# sleep 5
+# echo "Running: proocessbench_myprm_qwen_benchmark.py | clf | Qwen3"
+# python proocessbench_myprm_qwen_benchmark.py --load_path "" --model_type clf --reward_model Qwen/Qwen3-8B
 
 # # qwen2.5-7B_clf_acc8_baseline_lr1e-4_dropout0.05
 # echo "Running: qwen2.5-7B_clf_acc8_baseline_lr1e-4_dropout0.05"
@@ -76,4 +94,4 @@ python proocessbench_myprm_qwen_benchmark.py --load_path "" --model_type clf --r
 # sleep 2
 
 
-} 2>&1 | tee output_log.txt
+} 2>&1 | tee baselines_output_log.txt
