@@ -76,7 +76,7 @@ def forward(model, tokenizer, question, stepwise_solution, special_tokens, add_n
             
     with torch.no_grad():
         outputs = model(input_ids=model_inputs['input_ids'].to(device),
-                        attention_mask=model_inputs['attention_mask'].to(device))
+                        attention_mask=model_inputs['attention_mask'].to(device),no_grad=True)
         
 
     return outputs, token_masks
