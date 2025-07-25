@@ -129,6 +129,7 @@ class QwenMathCondGen_RM(nn.Module):
         return value_outputs.squeeze(dim=1)
     
 def configure_module(args, device):
+    print("Configuring model with the following arguments:", args.model_type)
     if args.model_type == "token":
         model = QwenMathTokenClf_RM(device, args)
     else:
