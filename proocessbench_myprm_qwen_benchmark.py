@@ -1,8 +1,9 @@
-from datasets import load_dataset, load_from_disk
+from prm_data import load_data_custom
+from datasets import load_dataset
 from tqdm.auto import tqdm
 # ds = load_from_disk("../PRM800k_cleaned")
 process_benchmark = load_dataset("Qwen/ProcessBench")
-
+print("Loaded ProcessBench dataset with", process_benchmark, "samples.")
 
 
 device = "cuda" 
