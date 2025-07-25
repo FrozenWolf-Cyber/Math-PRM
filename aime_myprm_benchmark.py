@@ -31,6 +31,25 @@ Answer:
         
         return prompt
 
+import argparse
+
+parser = argparse.ArgumentParser(description="Model Configuration Arguments")
+parser.add_argument("--load_path", type=str, default="", help="Path to load model from")
+parser.add_argument("--peft_rank", type=int, default=-1, help="PEFT rank")
+parser.add_argument("--lora_alpha", type=float, default=32.0, help="Alpha for LoRA")
+parser.add_argument("--lora_dropout", type=float, default=0.05, help="Dropout for LoRA")
+parser.add_argument("--special_tokens", action="store_true", help="Use special tokens")
+parser.add_argument("--add_new_token", action="store_true", help="Add new token")
+parser.add_argument("--model_type", type=str, default="clf", help="Type of model")
+parser.add_argument("--reward_model", type=str, default="Qwen/Qwen2-0.5B", help="Reward model name")
+parser.add_argument("--freeze_till_last", action="store_true", help="Freeze all layers till last")
+parser.add_argument("--freeze_tokens", action="store_true", help="Freeze token embeddings")
+parser.add_argument("--freeze_all_but_bias", action="store_true", help="Freeze all layers except bias")
+
+
+args = parser.parse_args()
+if ("7B" in args.reward_model or "8B" in args.reward_model):
+    print("!!!Truncating input to 3100 tokens")
 
 def make_step_rewards(logits, token_masks):  
     probabilities = F.softmax(logits, dim=-1)
@@ -62,16 +81,17 @@ def forward(model, tokenizer, question, stepwise_solution, special_tokens, add_n
         SEP = len(tokenizer)-1
     else:
         SEP = tokenizer(SEP_TOKEN)['input_ids'][0]
-            
-    if special_tokens:
-        if len(model_inputs['input_ids'][0]) > 3100:
-            print("Truncating input to 3100 tokens")
-            model_inputs['input_ids'] = model_inputs['input_ids'][:, :3100]
-            model_inputs['attention_mask'] = model_inputs['attention_mask'][:, :3100]
-            ### add SEP token at the end
-            model_inputs['input_ids'][-1][-1] = SEP
-            model_inputs['attention_mask'][-1][-1] = 1
-            
+        
+
+    # if (len(model_inputs['input_ids'][0]) > 3100) and ("7B" in args.reward_model or "8B" in args.reward_model):
+    #     print("Truncating input to 3100 tokens")
+    #     model_inputs['input_ids'] = model_inputs['input_ids'][:, :3100]
+    #     model_inputs['attention_mask'] = model_inputs['attention_mask'][:, :3100]
+    #     ### add SEP token at the end
+    #     model_inputs['input_ids'][-1][-1] = SEP
+    #     model_inputs['attention_mask'][-1][-1] = 1    
+        
+    if special_tokens:            
         token_masks = torch.ones_like(model_inputs['input_ids']).long()
         token_masks[(model_inputs['input_ids']!=SEP)] = 0
     else:
@@ -105,23 +125,7 @@ def forward_no_tokens(model, tokenizer, question, stepwise_solution, add_new_tok
 from peft import PeftModel    
 from model import *
 
-import argparse
 
-parser = argparse.ArgumentParser(description="Model Configuration Arguments")
-parser.add_argument("--load_path", type=str, default="", help="Path to load model from")
-parser.add_argument("--peft_rank", type=int, default=-1, help="PEFT rank")
-parser.add_argument("--lora_alpha", type=float, default=32.0, help="Alpha for LoRA")
-parser.add_argument("--lora_dropout", type=float, default=0.05, help="Dropout for LoRA")
-parser.add_argument("--special_tokens", action="store_true", help="Use special tokens")
-parser.add_argument("--add_new_token", action="store_true", help="Add new token")
-parser.add_argument("--model_type", type=str, default="clf", help="Type of model")
-parser.add_argument("--reward_model", type=str, default="Qwen/Qwen2-0.5B", help="Reward model name")
-parser.add_argument("--freeze_till_last", action="store_true", help="Freeze all layers till last")
-parser.add_argument("--freeze_tokens", action="store_true", help="Freeze token embeddings")
-parser.add_argument("--freeze_all_but_bias", action="store_true", help="Freeze all layers except bias")
-
-
-args = parser.parse_args()
 
 
 
@@ -132,6 +136,9 @@ if args.add_new_token:
 
 
 model = configure_module(args, device)
+## set grad false and freeze
+for param in model.parameters():
+    param.requires_grad = False
 
 if args.load_path != "":
     if args.peft_rank != -1:
