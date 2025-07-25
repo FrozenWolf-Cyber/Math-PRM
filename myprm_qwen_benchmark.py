@@ -161,7 +161,7 @@ if args.load_path != "":
         
 special_tokens, add_new_token = args.special_tokens, args.add_new_token
 
-
+print("Starting evaluation...")
 history = []
 all_step_pred, all_step_labels, all_problem_correctness, all_problem_pred = [], [], [], []
 for questions, solutions, step_labels, correctness in tqdm(zip(
