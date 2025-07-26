@@ -130,18 +130,50 @@ if args.add_new_token:
     num_added_tokens = tokenizer.add_tokens(new_tokens)
 
 
+import torch
+from peft import PeftModel, PeftConfig
+from transformers import AutoModelForCausalLM
+from safetensors.torch import load_file
+from collections import OrderedDict
+from peft import set_peft_model_state_dict
+
 model = configure_module(args, device)
-## set grad false and freeze
-for param in model.parameters():
-    param.requires_grad = False
 
 if args.load_path != "":
+    adapter_path = f"{args.load_path}/lower_weights"
+
     if args.peft_rank != -1:
-        model.base_model = PeftModel.from_pretrained(model.base_model, f"{args.load_path}/lower_weights")
-    else:
-        model.base_model.from_pretrained(f"{args.load_path}/lower_weights")
-    model.LN.load_state_dict(torch.load(f"{args.load_path}/lower_weights_LN.pt"))
+        model.base_model = PeftModel.from_pretrained(model.base_model, adapter_path)
+        # Debug: Check for missing keys
+        adapter_state = load_file(f"{adapter_path}/adapter_model.safetensors")
+        new_state = OrderedDict()
+        for k, v in adapter_state.items():
+            if ".lora_A.weight" in k:
+                new_k = k.replace(".lora_A.weight", ".lora_A.default.weight")
+            elif ".lora_B.weight" in k:
+                new_k = k.replace(".lora_B.weight", ".lora_B.default.weight")
+            else:
+                new_k = k
+            new_state[new_k] = v
+            
+        adapter_state = new_state
+        model_keys = [k for k, _ in model.base_model.named_parameters() if "lora" in k]
         
+        print("\n=== Missing Adapter Keys ===")
+        for k in adapter_state.keys():
+            if k not in model_keys:
+                print(k)
+                
+        set_peft_model_state_dict(model.base_model, new_state)
+    else:
+        model.base_model.from_pretrained(adapter_path)
+
+
+    ln_path = f"{args.load_path}/lower_weights_LN.pt"
+
+    model.LN.load_state_dict(torch.load(ln_path, map_location=device))
+
+model = model.to(device) 
 special_tokens, add_new_token = args.special_tokens, args.add_new_token
 
 

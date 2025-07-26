@@ -142,7 +142,6 @@ parser.add_argument("--freeze_all_but_bias", action="store_true", help="Freeze a
 
 args = parser.parse_args()
 
-from peft import set_peft_model_state_dict
 
 
 tokenizer = AutoTokenizer.from_pretrained(args.reward_model, trust_remote_code=True)
@@ -155,6 +154,7 @@ from peft import PeftModel, PeftConfig
 from transformers import AutoModelForCausalLM
 from safetensors.torch import load_file
 from collections import OrderedDict
+from peft import set_peft_model_state_dict
 
 model = configure_module(args, device)
 
@@ -177,7 +177,11 @@ if args.load_path != "":
             
         adapter_state = new_state
         model_keys = [k for k, _ in model.base_model.named_parameters() if "lora" in k]
-        
+        print("\n=== Model Keys ===")
+        for k in model_keys:
+            if k not in adapter_state:
+                print(f"Missing key in adapter state: {k}")
+                
         print("\n=== Missing Adapter Keys ===")
         for k in adapter_state.keys():
             if k not in model_keys:
