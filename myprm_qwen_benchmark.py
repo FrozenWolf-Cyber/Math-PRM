@@ -162,57 +162,37 @@ if args.load_path != "":
     adapter_path = f"{args.load_path}/lower_weights"
 
     if args.peft_rank != -1:
-        # Proper PEFT loading with debug info
-        try:
-            # Load PEFT config
-            peft_config = PeftConfig.from_pretrained(adapter_path)
-
-            # Reload base model to ensure correct weight structure
-            model.base_model = AutoModelForCausalLM.from_pretrained(peft_config.base_model_name_or_path)
-
-            # Load adapter into base model
-            model.base_model = PeftModel.from_pretrained(model.base_model, adapter_path)
-
-            # Debug: Check for missing keys
-            adapter_state = load_file(f"{adapter_path}/adapter_model.safetensors")
-            new_state = OrderedDict()
-            for k, v in adapter_state.items():
-                if ".lora_A.weight" in k:
-                    new_k = k.replace(".lora_A.weight", ".lora_A.default.weight")
-                elif ".lora_B.weight" in k:
-                    new_k = k.replace(".lora_B.weight", ".lora_B.default.weight")
-                else:
-                    new_k = k
-                new_state[new_k] = v
+        model.base_model = PeftModel.from_pretrained(model.base_model, adapter_path)
+        # Debug: Check for missing keys
+        adapter_state = load_file(f"{adapter_path}/adapter_model.safetensors")
+        new_state = OrderedDict()
+        for k, v in adapter_state.items():
+            if ".lora_A.weight" in k:
+                new_k = k.replace(".lora_A.weight", ".lora_A.default.weight")
+            elif ".lora_B.weight" in k:
+                new_k = k.replace(".lora_B.weight", ".lora_B.default.weight")
+            else:
+                new_k = k
+            new_state[new_k] = v
+            
+        adapter_state = new_state
+        model_keys = [k for k, _ in model.base_model.named_parameters() if "lora" in k]
+        
+        print("\n=== Missing Adapter Keys ===")
+        for k in adapter_state.keys():
+            if k not in model_keys:
+                print(k)
                 
-            adapter_state = new_state
-            print("\n=== Saved Adapter Keys ===")
-            for k in adapter_state:
-                print(k)
-
-            print("\n=== Current Model LoRA Keys ===")
-            model_keys = [k for k, _ in model.base_model.named_parameters() if "lora" in k]
-            for k in model_keys:
-                print(k)
-
-            print("\n=== Missing Adapter Keys ===")
-            for k in adapter_state.keys():
-                if k not in model_keys:
-                    print(k)
-
-        except Exception as e:
-            print(f"Failed to load PEFT adapter: {e}")
-
+        set_peft_model_state_dict(model.base_model, new_state)
     else:
         model.base_model.from_pretrained(adapter_path)
 
-    # Load LayerNorm weights
-    ln_path = f"{args.load_path}/lower_weights_LN.pt"
-    try:
-        model.LN.load_state_dict(torch.load(ln_path, map_location=device))
-    except Exception as e:
-        print(f"Failed to load LN weights: {e}")
 
+    ln_path = f"{args.load_path}/lower_weights_LN.pt"
+
+    model.LN.load_state_dict(torch.load(ln_path, map_location=device))
+
+model = model.to(device)
 special_tokens, add_new_token = args.special_tokens, args.add_new_token
 
 print("Starting evaluation...")
