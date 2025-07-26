@@ -152,6 +152,8 @@ if args.add_new_token:
 import torch
 from peft import PeftModel, PeftConfig
 from transformers import AutoModelForCausalLM
+from safetensors.torch import load_file
+
 
 model = configure_module(args, device)
 
@@ -171,7 +173,7 @@ if args.load_path != "":
             model.base_model = PeftModel.from_pretrained(model.base_model, adapter_path)
 
             # Debug: Check for missing keys
-            adapter_state = torch.load(f"{adapter_path}/adapter_model.bin", map_location="cpu")
+            adapter_state = load_file(f"{adapter_path}/adapter_model.safetensors")
             print("\n=== Saved Adapter Keys ===")
             for k in adapter_state:
                 print(k)
