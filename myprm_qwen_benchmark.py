@@ -184,6 +184,8 @@ if args.load_path != "":
                 else:
                     new_k = k
                 new_state[new_k] = v
+                
+            adapter_state = new_state
             print("\n=== Saved Adapter Keys ===")
             for k in adapter_state:
                 print(k)
