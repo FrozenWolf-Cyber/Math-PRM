@@ -173,6 +173,8 @@ if args.load_path != "":
                 new_k = k.replace(".lora_B.weight", ".lora_B.default.weight")
             else:
                 new_k = k
+                
+            new_k = "base_model.model." + new_k
             new_state[new_k] = v
             
         adapter_state = new_state
