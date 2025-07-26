@@ -4,6 +4,13 @@ import torch
 import torch.nn as nn
 import gc
 from peft import LoraConfig, TaskType, get_peft_model
+import torch
+from peft import PeftModel, PeftConfig
+from transformers import AutoModelForCausalLM
+from safetensors.torch import load_file
+from collections import OrderedDict
+from peft import set_peft_model_state_dict
+
 DEBUG = True
 # # Define LoRA configuration
 # lora_config = LoraConfig(
@@ -134,20 +141,45 @@ def configure_module(args, device):
     else:
         model = QwenMathCondGen_RM(device, args)
         
+    adapter_path = f"{args.load_path}/lower_weights"
+
     if args.peft_rank != -1:
-            peft_config = LoraConfig(
-            task_type=TaskType.TOKEN_CLS if args.model_type == "token" else TaskType.CAUSAL_LM,
-            r=args.peft_rank,
-            lora_alpha=args.lora_alpha,
-            lora_dropout=args.lora_dropout,
-            target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"] 
-        )
-            model.base_model = get_peft_model(model.base_model, peft_config)
-            print("Using PEFT model with LoRA configuration:\n","----"*10)
-            print(peft_config)
-            print("Trainable parameters in PEFT model:", model.base_model.print_trainable_parameters())
-            print("LN parameters:", sum(p.numel() for p in model.LN.parameters() if p.requires_grad))
+        model.base_model = PeftModel.from_pretrained(model.base_model, adapter_path)
+        # Debug: Check for missing keys
+        adapter_state = load_file(f"{adapter_path}/adapter_model.safetensors")
+        new_state = OrderedDict()
+        for k, v in adapter_state.items():
+            if ".lora_A.weight" in k:
+                new_k = k.replace(".lora_A.weight", ".lora_A.default.weight")
+            elif ".lora_B.weight" in k:
+                new_k = k.replace(".lora_B.weight", ".lora_B.default.weight")
+            else:
+                new_k = k
+                
+            new_k = "base_model.model." + new_k
+            new_state[new_k] = v
             
+        adapter_state = new_state
+        model_keys = [k for k, _ in model.base_model.named_parameters() if "lora" in k]
+        print("\n=== Model Keys ===")
+        for k in model_keys:
+            if k not in adapter_state:
+                print(f"Missing key in adapter state: {k}")
+                
+        print("\n=== Missing Adapter Keys ===")
+        for k in adapter_state.keys():
+            if k not in model_keys:
+                print(k)
+                
+        set_peft_model_state_dict(model.base_model, new_state)
+    else:
+        model.base_model.from_pretrained(adapter_path)
+
+
+    ln_path = f"{args.load_path}/lower_weights_LN.pt"
+
+    model.LN.load_state_dict(torch.load(ln_path, map_location=device))
+    
     if args.freeze_till_last:
         for param in model.base_model.parameters():
             param.requires_grad = False
