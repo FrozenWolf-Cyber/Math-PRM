@@ -143,7 +143,7 @@ def configure_module(args, device):
      
     if args.load_path!="":   
         adapter_path = f"{args.load_path}/lower_weights"
-    
+
         if args.peft_rank != -1:
             model.base_model = PeftModel.from_pretrained(model.base_model, adapter_path)
             # Debug: Check for missing keys
@@ -156,31 +156,40 @@ def configure_module(args, device):
                     new_k = k.replace(".lora_B.weight", ".lora_B.default.weight")
                 else:
                     new_k = k
-                    
-                
+
+
                 # new_k =  new_k[17:]
                 new_state[new_k] = v
-                
+
             adapter_state = new_state
             model_keys = [k for k, _ in model.base_model.named_parameters() if "lora" in k]
             print("\n=== Model Keys ===")
             for k in model_keys:
                 if k not in adapter_state:
                     print(f"Missing key in adapter state: {k}")
-                    
+
             print("\n=== Missing Adapter Keys ===")
             for k in adapter_state.keys():
                 if k not in model_keys:
                     print(k)
-                    
+
             set_peft_model_state_dict(model.base_model, new_state)
         else:
             model.base_model.from_pretrained(adapter_path)
-    
-    
+
+        ## print LN size
+        print(model.LN)
+        for name, param in model.LN.named_parameters():
+            print(f"  {name}: {param.shape}")
+
         ln_path = f"{args.load_path}/lower_weights_LN.pt"
-    
-        model.LN.load_state_dict(torch.load(ln_path, map_location=device))
+        std = torch.load(ln_path, map_location=device)
+        
+        print("Loaded LN state_dict contents and shapes:")
+        for k, v in std.items():
+            print(f"  {k}: {v.shape}")
+                  
+        model.LN.load_state_dict(std)
     
     if args.freeze_till_last:
         for param in model.base_model.parameters():
