@@ -184,7 +184,7 @@ class QwenMathDataset(Dataset):
         else:
             text = chat_template_no_special(prompt, completions)    
         
-        print(self.SEP)
+        print(self.SEP, SEP_TOKEN, self.tokenizer(SEP_TOKEN))
         print(text)
         model_inputs = self.tokenizer([text], return_tensors="pt")
         print(model_inputs['input_ids'])
