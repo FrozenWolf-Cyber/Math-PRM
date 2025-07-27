@@ -73,11 +73,9 @@ class QwenMathDataset(Dataset):
                 data = data.drop(columns=['__index_level_0__'])
             self.dataset = HF_Dataset.from_pandas(data)
         
-        if SEP_TOKEN == '<PRM_STEP_SCORE>':
-            self.SEP = len(self.tokenizer)-1
-        else:
-            print("Separator token is:", SEP_TOKEN, self.tokenizer(SEP_TOKEN))
-            self.SEP = self.tokenizer(SEP_TOKEN)['input_ids'][0]
+
+        print("Separator token is:", SEP_TOKEN, self.tokenizer(SEP_TOKEN))
+        self.SEP = self.tokenizer(SEP_TOKEN)['input_ids'][0]
             
         print("dataset size after step filter:", len(self.dataset))
 
@@ -189,6 +187,7 @@ class QwenMathDataset(Dataset):
         print(self.SEP)
         print(text)
         model_inputs = self.tokenizer([text], return_tensors="pt")
+        print(model_inputs['input_ids'])
         labels = torch.ones_like(model_inputs['input_ids']).long()
 
         if self.special_tokens:
