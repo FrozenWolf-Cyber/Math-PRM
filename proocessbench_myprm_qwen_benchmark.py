@@ -162,9 +162,9 @@ for dataset in process_benchmark:
             score = torch.tensor(step_rewards)
             score = torch.log(score / (1 - score))
             score = score.sum()
-            score = torch.sigmoid(score)
+            score = torch.sigmoid(score).item()
         
-
+        correctness = 1 if correctness else 0
         all_problem_correctness+=[correctness]
         if special_tokens:
             a = step_rewards[-1]

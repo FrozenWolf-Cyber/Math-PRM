@@ -189,7 +189,9 @@ for questions, solutions, step_labels, correctness in tqdm(zip(
         score = torch.tensor(step_rewards)
         score = torch.log(score / (1 - score))
         score = score.sum()
-        score = torch.sigmoid(score)
+        score = torch.sigmoid(score).item()
+        
+    correctness = 1 if correctness else 0
         
     history.append({
 		'question': questions,
