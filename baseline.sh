@@ -2,21 +2,21 @@
 
 {
 	# qwen2.5-7B_token_acc16_baseline_lr1e-4_dropout0
-echo "Running: qwen2.5-7B_token_acc16_baseline_lr1e-4_dropout0"
-python aime_myprm_benchmark.py --load_path weights/elated-cosmos-198 --peft_rank 16 --lora_dropout 0 --special_tokens --add_new_token --model_type token --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
-sleep 2
-python myprm_qwen_benchmark.py --load_path weights/elated-cosmos-198 --peft_rank 16 --lora_dropout 0 --special_tokens --add_new_token --model_type token --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
-sleep 2
-python proocessbench_myprm_qwen_benchmark.py --load_path weights/elated-cosmos-198 --peft_rank 16 --lora_dropout 0 --special_tokens --add_new_token --model_type token --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
-sleep 2
+# echo "Running: qwen2.5-7B_token_acc16_baseline_lr1e-4_dropout0"
+# python aime_myprm_benchmark.py --load_path weights/elated-cosmos-198 --peft_rank 16 --lora_dropout 0 --special_tokens --add_new_token --model_type token --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
+# sleep 2
+# python myprm_qwen_benchmark.py --load_path weights/elated-cosmos-198 --peft_rank 16 --lora_dropout 0 --special_tokens --add_new_token --model_type token --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
+# sleep 2
+# python proocessbench_myprm_qwen_benchmark.py --load_path weights/elated-cosmos-198 --peft_rank 16 --lora_dropout 0 --special_tokens --add_new_token --model_type token --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
+# sleep 2
 
 # qwen2.5-7B_clf_acc8_baseline_lr1e-4_dropout0
 echo "Running: qwen2.5-7B_clf_acc8_baseline_lr1e-4_dropout0"
-python aime_myprm_benchmark.py --load_path weights/tough-moon-199 --peft_rank 16 --lora_dropout 0 --special_tokens --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
+python aime_myprm_benchmark.py --load_path weights/tough-moon-199 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
 sleep 2
-python myprm_qwen_benchmark.py --load_path weights/tough-moon-199 --peft_rank 16 --lora_dropout 0 --special_tokens --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
+python myprm_qwen_benchmark.py --load_path weights/tough-moon-199 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
 sleep 2
-python proocessbench_myprm_qwen_benchmark.py --load_path weights/tough-moon-199 --peft_rank 16 --lora_dropout 0 --special_tokens --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
+python proocessbench_myprm_qwen_benchmark.py --load_path weights/tough-moon-199 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
 sleep 2
 
 # echo "Running: proocessbench_myprm_qwen_benchmark.py | token | Qwen2.5"
