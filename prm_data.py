@@ -184,14 +184,11 @@ class QwenMathDataset(Dataset):
         else:
             text = chat_template_no_special(prompt, completions)    
         
-        print(self.SEP, SEP_TOKEN, self.tokenizer(SEP_TOKEN))
-        print(text)
+
         model_inputs = self.tokenizer([text], return_tensors="pt")
-        print(model_inputs['input_ids'])
         labels = torch.ones_like(model_inputs['input_ids']).long()
 
         if self.special_tokens:
-            print(labels[(model_inputs['input_ids']==self.SEP)], torch.tensor(raw_labels))
             labels[(model_inputs['input_ids']!=self.SEP)] = -100
             labels[(model_inputs['input_ids']==self.SEP)] = torch.tensor(raw_labels).long()
         else:
@@ -388,7 +385,7 @@ def build_dataloader(
     next(iter(train_dataloader)) 
      
      
-    cache_meta_name = f"qwen_math_meta_dataset_{len(meta_dataset)}_steps_{filter_dataset_steps}_token_size_{filter_dataset_token_size}_token_based{token_based}.pkl"
+    cache_meta_name = f"qwen_math_meta_dataset_{len(meta_dataset)}_steps_{filter_dataset_steps}_token_size_{filter_dataset_token_size}_token_based{token_based}_{add_new_token}.pkl"
     if os.path.exists(cache_meta_name):
         meta_dataset = pickle.load(open(cache_meta_name, "rb")) 
     else:
