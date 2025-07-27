@@ -186,7 +186,8 @@ class QwenMathDataset(Dataset):
         else:
             text = chat_template_no_special(prompt, completions)    
         
-
+        print(self.SEP)
+        print(text)
         model_inputs = self.tokenizer([text], return_tensors="pt")
         labels = torch.ones_like(model_inputs['input_ids']).long()
 
