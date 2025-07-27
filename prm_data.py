@@ -373,7 +373,7 @@ def build_dataloader(
         meta_dataset = HF_Dataset.from_pandas(df)
     
 
-    cache_train_name = f"qwen_math_train_dataset_{len(data['train'])}_steps_{filter_dataset_steps}_token_size_{filter_dataset_token_size}_token_based{token_based}.pkl"
+    cache_train_name = f"qwen_math_train_dataset_{len(data['train'])}_steps_{filter_dataset_steps}_token_size_{filter_dataset_token_size}_token_based{token_based}_{add_new_token}.pkl"
     if os.path.exists(cache_train_name):
         train_dataset = pickle.load(open(cache_train_name, "rb"))
     else:
