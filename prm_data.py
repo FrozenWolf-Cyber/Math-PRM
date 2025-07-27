@@ -191,6 +191,7 @@ class QwenMathDataset(Dataset):
         labels = torch.ones_like(model_inputs['input_ids']).long()
 
         if self.special_tokens:
+            print(labels[(model_inputs['input_ids']==self.SEP)], torch.tensor(raw_labels))
             labels[(model_inputs['input_ids']!=self.SEP)] = -100
             labels[(model_inputs['input_ids']==self.SEP)] = torch.tensor(raw_labels).long()
         else:
