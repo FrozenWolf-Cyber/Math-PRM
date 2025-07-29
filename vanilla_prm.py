@@ -38,20 +38,20 @@ if not os.path.exists(path):
     os.makedirs(path)
 
 
-class DebugTokenClassifier(torch.nn.Module):
-    def __init__(self, model_name, num_labels=2):
-        super().__init__()
-        self.model = AutoModelForTokenClassification.from_pretrained(model_name, num_labels=num_labels)
-        self.model.resize_token_embeddings(len(tokenizer))
+# class DebugTokenClassifier(torch.nn.Module):
+#     def __init__(self, model_name, num_labels=2):
+#         super().__init__()
+#         self.model = AutoModelForTokenClassification.from_pretrained(model_name, num_labels=num_labels)
+#         self.model.resize_token_embeddings(len(tokenizer))
 
-    def forward(self, input_ids=None, attention_mask=None, **kwargs):
-        print("Input IDs:\n", input_ids.shape)
-        print("Attention Mask:\n", attention_mask.shape)
-        return self.model(input_ids=input_ids, attention_mask=attention_mask, **kwargs)
+#     def forward(self, input_ids=None, attention_mask=None, **kwargs):
+#         print("Input IDs:\n", input_ids.shape)
+#         print("Attention Mask:\n", attention_mask.shape)
+#         return self.model(input_ids=input_ids, attention_mask=attention_mask, **kwargs)
 
 
-# model = AutoModelForTokenClassification.from_pretrained(model, num_labels=2)
-model = DebugTokenClassifier(model, num_labels=2)
+model = AutoModelForTokenClassification.from_pretrained(model, num_labels=2)
+# model = DebugTokenClassifier(model, num_labels=2)
 if args.peft_rank > 0:
     
     peft_config = LoraConfig(
@@ -61,7 +61,7 @@ if args.peft_rank > 0:
                 lora_dropout=args.lora_dropout,
                 target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"] 
             )
-    model.model = get_peft_model(model.model, peft_config)
+    model = get_peft_model(model, peft_config)
 
 train_dataset = load_dataset("FrozenWolf/prm800k")
 val_dataset = train_dataset['test']
