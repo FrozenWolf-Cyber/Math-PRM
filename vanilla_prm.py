@@ -9,8 +9,12 @@ import pandas as pd
 from tqdm.auto import tqdm
 from prm_data import *
 from argparse import ArgumentParser
+from peft import LoraConfig, TaskType, get_peft_model
 parser = ArgumentParser()
 parser.add_argument("--reward_model", type=str, default="Qwen/Qwen2.5-Math-7B-Instruct")
+parser.add_argument("--peft_rank", type=int, default=-1, help="Rank for PEFT, -1 for no PEFT")
+parser.add_argument("--lora_alpha", type=float, default=32.0, help="Alpha for LoRA")
+parser.add_argument("--lora_dropout", type=float, default=0.05, help="Dropout for LoRA")
 parser.add_argument("--train_batch_size", type=int, default=10)
 args = parser.parse_args()
 
@@ -35,6 +39,14 @@ if not os.path.exists(path):
 
 model = AutoModelForTokenClassification.from_pretrained(model, num_labels=2)
 model.resize_token_embeddings(len(tokenizer))
+peft_config = LoraConfig(
+            task_type=TaskType.TOKEN_CLS,
+            r=args.peft_rank,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"] 
+        )
+model = get_peft_model(model, peft_config)
 
 train_dataset = load_dataset("FrozenWolf/prm800k")
 val_dataset = train_dataset['test']
