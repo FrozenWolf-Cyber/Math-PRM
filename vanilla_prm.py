@@ -15,9 +15,9 @@ parser.add_argument("--reward_model", type=str, default="Qwen/Qwen2.5-Math-7B-In
 parser.add_argument("--peft_rank", type=int, default=-1, help="Rank for PEFT, -1 for no PEFT")
 parser.add_argument("--lora_alpha", type=float, default=32.0, help="Alpha for LoRA")
 parser.add_argument("--lora_dropout", type=float, default=0.05, help="Dropout for LoRA")
-parser.add_argument("--train_batch_size", type=int, default=10)
+parser.add_argument("--train_batch_size", type=int, default=4)
 args = parser.parse_args()
-
+print("Trraining with args:", args)
 
 wandb.init(project="DreamPRM-AIME", mode="online")
 run_name = wandb.run.name
