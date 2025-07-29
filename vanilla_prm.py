@@ -78,7 +78,7 @@ training_args = PRMConfig(
     save_total_limit=2,            
     num_train_epochs=5, 
     step_separator=new_tokens[0],      
-    per_gpu_train_batch_size=10,  per_gpu_eval_batch_size=1      
+    per_gpu_train_batch_size=args.train_batch_size,  per_gpu_eval_batch_size=args.train_batch_size
 )
 trainer = PRMTrainer(model=model, args=training_args, processing_class=tokenizer, train_dataset=train_dataset, eval_dataset=val_dataset)
 trainer.train()
