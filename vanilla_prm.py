@@ -39,14 +39,16 @@ if not os.path.exists(path):
 
 model = AutoModelForTokenClassification.from_pretrained(model, num_labels=2)
 model.resize_token_embeddings(len(tokenizer))
-peft_config = LoraConfig(
-            task_type=TaskType.TOKEN_CLS,
-            r=args.peft_rank,
-            lora_alpha=args.lora_alpha,
-            lora_dropout=args.lora_dropout,
-            target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"] 
-        )
-model = get_peft_model(model, peft_config)
+if args.peft_rank > 0:
+    
+    peft_config = LoraConfig(
+                task_type=TaskType.TOKEN_CLS,
+                r=args.peft_rank,
+                lora_alpha=args.lora_alpha,
+                lora_dropout=args.lora_dropout,
+                target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"] 
+            )
+    model = get_peft_model(model, peft_config)
 
 train_dataset = load_dataset("FrozenWolf/prm800k")
 val_dataset = train_dataset['test']
