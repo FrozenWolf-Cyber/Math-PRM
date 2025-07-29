@@ -3,3 +3,4 @@ wandb
 weights
 *.pkl
 prm800k
+local_ignore.ipynb
