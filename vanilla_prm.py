@@ -45,8 +45,8 @@ class DebugTokenClassifier(torch.nn.Module):
         self.model.resize_token_embeddings(len(tokenizer))
 
     def forward(self, input_ids=None, attention_mask=None, **kwargs):
-        print("Input IDs:\n", input_ids)
-        print("Attention Mask:\n", attention_mask)
+        print("Input IDs:\n", input_ids.shape)
+        print("Attention Mask:\n", attention_mask.shape)
         return self.model(input_ids=input_ids, attention_mask=attention_mask, **kwargs)
 
 
