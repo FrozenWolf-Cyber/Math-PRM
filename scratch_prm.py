@@ -363,7 +363,7 @@ while iter < args.iteration_num:
         if iter % args.save_every_iterations == 0:
             lower.module.eval()
             print("Validating lower model at iteration", iter)
-            # lower.validation()
+            lower.validation()
 
         lower.module.train()
         
