@@ -362,7 +362,8 @@ while iter < args.iteration_num:
     for batch in tqdm(lower.dataloader, desc="Training Lower Model"):
         if iter % args.save_every_iterations == 0:
             lower.module.eval()
-            lower.validation()
+            print("Validating lower model at iteration", iter)
+            # lower.validation()
 
         lower.module.train()
         
