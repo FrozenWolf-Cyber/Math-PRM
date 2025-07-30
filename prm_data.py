@@ -25,6 +25,43 @@ subjects_map = {'Algebra':0,
 
 SEP_TOKEN = '<PRM_STEP_SCORE>'
 
+import random
+from tqdm import tqdm
+def balance_index_map(dataset):
+    df = dataset.dataset.to_pandas()
+    labels_column = df['labels']
+
+    true_entries = []
+    false_entries = []
+
+    # Fast loop to separate true/false entries
+    for _, (ds_idx, step_idx) in tqdm(dataset.index_map.items()):
+        label = labels_column[ds_idx][step_idx]
+        if label:
+            true_entries.append((ds_idx, step_idx))
+        else:
+            false_entries.append((ds_idx, step_idx))
+
+    # Determine how many to match
+    n = max(len(true_entries), len(false_entries))
+    print(f"Balancing dataset: {len(true_entries)} true entries, {len(false_entries)} false entries, target size {n}")
+    print(f"Repeating true_entries {((n + len(true_entries) - 1) // len(true_entries))}")
+    print(f"Repeating false_entries {((n + len(false_entries) - 1) // len(false_entries))}")
+    # Simple oversampling using repetition + slicing
+    true_entries = (true_entries * ((n + len(true_entries) - 1) // len(true_entries)))[:n]
+    false_entries = (false_entries * ((n + len(false_entries) - 1) // len(false_entries)))[:n]
+
+    # Shuffle
+    random.shuffle(true_entries)
+    random.shuffle(false_entries)
+
+    # Interleave
+    interleaved = [x for pair in zip(true_entries, false_entries) for x in pair]
+
+    # Update index_map
+    dataset.index_map = {i: val for i, val in enumerate(interleaved)}
+    return dataset
+
 def chat_template( question, steps):
         global SEP_TOKEN
         steps = f' {SEP_TOKEN} \n'.join(steps)
@@ -57,12 +94,13 @@ class QwenMathDataset(Dataset):
     [A, B, C] -> [T, F, T]
     special_tokens -> True for Token based model
     '''
-    def __init__(self, data, tokenizer, special_tokens=True, inference=False, has_subjects=True, filter_dataset_steps=-1, filter_dataset_token_size=-1):
+    def __init__(self, data, tokenizer, special_tokens=True, inference=False, has_subjects=True, filter_dataset_steps=-1, filter_dataset_token_size=-1, balanced_sampling=False):
         self.dataset = data
         self.tokenizer = tokenizer
         self.special_tokens = special_tokens
         self.inference = inference
         self.has_subjects = has_subjects
+        self.balanced_sampling = balanced_sampling
         
         print(f"Dataset loaded with {len(self.dataset)} samples.")
         if filter_dataset_steps > 0:
@@ -302,7 +340,7 @@ class QwenMathMetaDataset(Dataset):
     
 def build_dataloader(
         tokenizer, train_batch_size, meta_batch_size, inf_batch_size=1, token_based=True, add_new_token=True, meta_dataset="AIME", filter_dataset_steps=-1, filter_dataset_token_size=-1, # "AIME" or "PRM800K"
-        sanity_check=False, overfit=-1,
+        sanity_check=False, overfit=-1, balance=False
 ):
     
     if not add_new_token:
@@ -381,7 +419,17 @@ def build_dataloader(
         with open(cache_train_name, "wb") as f:
             pickle.dump(train_dataset, f)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=train_batch_size, shuffle=False if sanity_check else True, collate_fn=collate_merge_minibatch)
+    if balance and not token_based:
+        print("Balancing dataset...")
+        print("Initial length of dataset:", len(train_dataset))
+        train_dataset = balance_index_map(train_dataset)
+        print("Dataset balanced.")
+        train_dataset.len = len(train_dataset.index_map)
+        print("Length of balanced dataset:", len(train_dataset))
+        print(f"Shuffle set to False for balanced dataset.: {False if (sanity_check or overfit or balance) else True,}")
+    else:
+        print("Skipping dataset balancing.")
+    train_dataloader = DataLoader(train_dataset, batch_size=train_batch_size, shuffle=False if (sanity_check or overfit or balance) else True, collate_fn=collate_merge_minibatch)
     next(iter(train_dataloader)) 
      
      

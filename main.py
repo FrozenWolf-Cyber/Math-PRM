@@ -63,6 +63,8 @@ parser.add_argument("--lora_alpha", type=float, default=32.0, help="Alpha for Lo
 parser.add_argument("--lora_dropout", type=float, default=0.05, help="Dropout for LoRA")
 parser.add_argument("--load_path", type=str, default="", help="Path to load the model from")
 parser.add_argument("--evaluate_only", action="store_true")
+parser.add_argument("--balance", action="store_true")
+
 
 args = parser.parse_args()
 print(args)
@@ -138,6 +140,7 @@ resume_labels = None
     filter_dataset_steps=args.filter_dataset_steps,
     filter_dataset_token_size=args.filter_dataset_token_size,
     overfit = args.overfit,
+    balance=args.balance,
 )
 
 
