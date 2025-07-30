@@ -174,7 +174,7 @@ best_loss = 1000
 class Lower:
     def __init__(self):
         self.module = configure_module(args, device)
-        self.dataloader, self.optim = self.configure_train_data_loader(), self.configure_optimizer
+        self.dataloader, self.optim = self.configure_train_data_loader(), self.configure_optimizer()
     
     def forward(self, input_ids, attention_mask, no_grad=False):
         # torch.cuda.empty_cache()
