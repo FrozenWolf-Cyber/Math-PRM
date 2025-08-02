@@ -48,6 +48,12 @@ parser.add_argument("--freeze_all_but_bias", action="store_true", help="Freeze a
 
 
 args = parser.parse_args()
+
+## manually set all freeze flags to true
+args.freeze_till_last = True
+args.freeze_tokens = True
+args.freeze_all_but_bias = True
+
 if ("7B" in args.reward_model or "8B" in args.reward_model):
     print("!!!Truncating input to 3100 tokens")
 
@@ -142,8 +148,9 @@ model = configure_module(args, device)
 
 model = model.to(device) 
 special_tokens, add_new_token = args.special_tokens, args.add_new_token
-
-
+special_tokens = args.model_type == "token"
+if args.special_tokens!= special_tokens:
+    print("!!!!!Warning: special_tokens argument does not match model type. Using model type's special tokens setting.")
 
 import os
 import pandas as pd
