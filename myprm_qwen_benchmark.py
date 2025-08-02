@@ -167,6 +167,7 @@ for questions, solutions, step_labels, correctness in tqdm(zip(
     dst_selected['correctness'].tolist()
 ), total=len(dst_selected)):
     
+    raw_output = None
     if special_tokens:
         step_rewards, token_masks = forward(
         model=model,
@@ -176,6 +177,7 @@ for questions, solutions, step_labels, correctness in tqdm(zip(
         special_tokens=True,
         add_new_token=add_new_token
         )
+        raw_output = [step_rewards, token_masks]
         step_rewards = make_step_rewards(step_rewards, token_masks)[0]
     else:
         step_rewards = forward_no_tokens(
@@ -185,7 +187,7 @@ for questions, solutions, step_labels, correctness in tqdm(zip(
             stepwise_solution=solutions,
             add_new_token=add_new_token
         )
-        
+        raw_output = step_rewards
         score = torch.tensor(step_rewards)
         score = torch.log(score / (1 - score))
         score = score.sum()
@@ -198,7 +200,8 @@ for questions, solutions, step_labels, correctness in tqdm(zip(
 		'solutions': solutions,
 		'step_rewards': step_rewards,
 		'step_labels': step_labels,
-		'correctness': correctness
+		'correctness': correctness,
+        'raw_output': raw_output
 	})
     all_step_pred+= [1 if i>=0.5 else 0 for i in step_rewards]
     all_step_labels+= [1 if i else 0 for i in step_labels.tolist()]
@@ -218,5 +221,10 @@ print("Step-wise Metrics:", step_metrics)
 print("Problem-wise Metrics:", problem_metric)
 
 
+## save with unique name
+import os
+wandb_name = args.load_path.split("/")[-1]
+name = f"my_qwen_benchmark_history_{wandb_name}.pkl"
 import pickle
-pickle.dump(history, open("my_qwen_benchmark_history.pkl", "wb"))
+with open(name, 'wb') as f:
+    pickle.dump(history, f)

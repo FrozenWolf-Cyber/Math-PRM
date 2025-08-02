@@ -139,7 +139,7 @@ for dataset in process_benchmark:
     df = process_benchmark[dataset].to_pandas()
     print(f"Number of samples: {len(df)}")
     for questions, solutions, correctness in zip(df['problem'], df['steps'], df['final_answer_correct']):
-
+        raw_output = None
         if special_tokens:
             step_rewards, token_masks = forward(
             model=model,
@@ -149,6 +149,7 @@ for dataset in process_benchmark:
             special_tokens=True,
             add_new_token=add_new_token
             )
+            raw_output = [step_rewards, token_masks]
             step_rewards = make_step_rewards(step_rewards, token_masks)[0]
         else:
             step_rewards = forward_no_tokens(
@@ -158,7 +159,7 @@ for dataset in process_benchmark:
                 stepwise_solution=solutions,
                 add_new_token=add_new_token
             )
-
+            raw_output = step_rewards
             score = torch.tensor(step_rewards)
             score = torch.log(score / (1 - score))
             score = score.sum()
@@ -175,13 +176,19 @@ for dataset in process_benchmark:
         history[dataset][questions] = {
             "step_rewards": step_rewards,
             "correctness": correctness,
-            "predicted_correctness": a
+            "predicted_correctness": a,
+            "raw_output": raw_output,
         }
         
     problem_metric = binary_classification_metrics(all_problem_pred, all_problem_correctness)
 
     print("Problem-wise Metrics:", problem_metric)
     
+
+## save with unique name
+import os
+wandb_name = args.load_path.split("/")[-1]
+name = f"my_qwen_process_benchmark_history_{wandb_name}.pkl"
 import pickle
-with open("my_qwen_process_benchmark_history.pkl", "wb") as f:
+with open(name, 'wb') as f:
     pickle.dump(history, f)

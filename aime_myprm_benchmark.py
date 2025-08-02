@@ -177,6 +177,7 @@ for ds in os.listdir(paths):
         
         all_problem_pred = []
         idx = 0
+        raw_output = []
         for questions, solutions in tqdm(zip(output['problem'].tolist(), output['completions'].tolist()), total=len(output)):
             if special_tokens:
                 step_rewards, token_masks = forward(
@@ -187,6 +188,7 @@ for ds in os.listdir(paths):
                 special_tokens=True,
                 add_new_token=add_new_token
                 )
+                raw_output.append([step_rewards, token_masks])
                 step_rewards = make_step_rewards(step_rewards, token_masks)[0]
             else:
                 step_rewards = forward_no_tokens(
@@ -196,7 +198,7 @@ for ds in os.listdir(paths):
                     stepwise_solution=solutions,
                     add_new_token=add_new_token
                 )
-
+                raw_output.append(step_rewards)
                 score = torch.tensor(step_rewards)
                 score = torch.log(score / (1 - score))
                 score = score.sum()
@@ -211,9 +213,12 @@ for ds in os.listdir(paths):
             
         predictions, score = eval(output, all_problem_pred, ds)
         print(f"Model {model_out} on dataset {ds} has score {score}")
-        prediction_history[ds][model_out] = predictions
+        prediction_history[ds][model_out] = [predictions, raw_output]
         
-        
+## save with unique name
+import os
+wandb_name = args.load_path.split("/")[-1]
+name = f"myprm_aime_prediction_history_{wandb_name}.pkl"
 import pickle
-with open("myprm_aime_prediction_history.pkl", "wb") as f:
+with open(name, 'wb') as f:
     pickle.dump(prediction_history, f)
