@@ -196,7 +196,7 @@ for ds in os.listdir(paths):
                 add_new_token=add_new_token
                 )
                 raw_output.append([step_rewards, token_masks])
-                step_rewards = make_step_rewards(step_rewards, token_masks)[0]
+                step_rewards = step_rewards[token_masks.bool()].tolist()
             else:
                 step_rewards = forward_no_tokens(
                     model=model,
