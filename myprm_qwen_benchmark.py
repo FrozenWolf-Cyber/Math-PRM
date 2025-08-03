@@ -156,6 +156,9 @@ model = configure_module(args, device)
 
 model = model.to(device)
 special_tokens, add_new_token = args.special_tokens, args.add_new_token
+special_tokens = args.model_type == "token"
+if args.special_tokens!= special_tokens:
+    print("!!!!!Warning: special_tokens argument does not match model type. Using model type's special tokens setting.")
 
 print("Starting evaluation...")
 history = []
