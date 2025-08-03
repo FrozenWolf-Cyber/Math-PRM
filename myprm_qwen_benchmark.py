@@ -182,9 +182,10 @@ for questions, solutions, step_labels, correctness in tqdm(zip(
         )
         raw_output = [step_rewards, token_masks]
         print(step_rewards.shape, token_masks)
-        print("preds", step_rewards[token_masks.bool()])
+        print("preds", step_rewards[token_masks.bool()].shape)
         step_rewards = make_step_rewards(step_rewards, token_masks)[0]
-        print("Step Rewards:", step_rewards.shape)
+        print("Step Rewards:", len(step_rewards))
+        print("Step Rewards:", step_rewards)
     else:
         step_rewards = forward_no_tokens(
             model=model,
