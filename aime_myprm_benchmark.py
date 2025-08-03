@@ -50,9 +50,9 @@ parser.add_argument("--freeze_all_but_bias", action="store_true", help="Freeze a
 args = parser.parse_args()
 
 ## manually set all freeze flags to true
-args.freeze_till_last = True
-args.freeze_tokens = True
-args.freeze_all_but_bias = True
+# args.freeze_till_last = True
+# args.freeze_tokens = True
+# args.freeze_all_but_bias = True
 
 if ("7B" in args.reward_model or "8B" in args.reward_model):
     print("!!!Truncating input to 3100 tokens")

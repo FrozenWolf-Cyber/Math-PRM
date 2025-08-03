@@ -17,30 +17,30 @@
 echo "Running: qwen2.5-7B_clf_acc8_scratch_newtoken_whole-sky-243"
 python aime_myprm_benchmark.py --load_path weights/whole-sky-243 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct
 sleep 2
-python myprm_qwen_benchmark.py --load_path weights/whole-sky-243 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct
-sleep 2
-python proocessbench_myprm_qwen_benchmark.py --load_path weights/whole-sky-243 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct
-sleep 2
+# python myprm_qwen_benchmark.py --load_path weights/whole-sky-243 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct
+# sleep 2
+# python proocessbench_myprm_qwen_benchmark.py --load_path weights/whole-sky-243 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct
+# sleep 2
 
 
 # qwen2.5-7B_token_acc1_scratch_newtoken_leafy-morning-242
 echo "Running: qwen2.5-7B_token_acc1_scratch_newtoken_leafy-morning-242"
 python aime_myprm_benchmark.py --load_path weights/leafy-morning-242 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type token --reward_model Qwen/Qwen2.5-Math-7B-Instruct
 sleep 2
-python myprm_qwen_benchmark.py --load_path weights/leafy-morning-242 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type token --reward_model Qwen/Qwen2.5-Math-7B-Instruct
-sleep 2
-python proocessbench_myprm_qwen_benchmark.py --load_path weights/leafy-morning-242 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type token --reward_model Qwen/Qwen2.5-Math-7B-Instruct
-sleep 2
+# python myprm_qwen_benchmark.py --load_path weights/leafy-morning-242 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type token --reward_model Qwen/Qwen2.5-Math-7B-Instruct
+# sleep 2
+# python proocessbench_myprm_qwen_benchmark.py --load_path weights/leafy-morning-242 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type token --reward_model Qwen/Qwen2.5-Math-7B-Instruct
+# sleep 2
 
 
 # qwen2.5-7B_clf_acc8_baseline_newtoken_silver-dawn-238
 echo "Running: qwen2.5-7B_clf_acc8_baseline_newtoken_silver-dawn-238"
 python aime_myprm_benchmark.py --load_path weights/silver-dawn-238 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct
 sleep 2
-python myprm_qwen_benchmark.py --load_path weights/silver-dawn-238 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct
-sleep 2
-python proocessbench_myprm_qwen_benchmark.py --load_path weights/silver-dawn-238 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct
-sleep 2
+# python myprm_qwen_benchmark.py --load_path weights/silver-dawn-238 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct
+# sleep 2
+# python proocessbench_myprm_qwen_benchmark.py --load_path weights/silver-dawn-238 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct
+# sleep 2
 
 	# qwen2.5-7B_token_acc16_baseline_lr1e-4_dropout0
 # echo "Running: qwen2.5-7B_token_acc16_baseline_lr1e-4_dropout0"
