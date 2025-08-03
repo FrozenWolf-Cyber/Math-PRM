@@ -119,6 +119,10 @@ python aime_qwen_benchmark.py
 python prm_qwen_benchmark.py
 python proocessbench_qwen_benchmark.py
 
+echo "Running: vanilla PRM denim-meadow-236"
+python prm_qwen_benchmark.py --load_path "weights/denim-meadow-236/Output-Qwen-Qwen2.5-Math-7B-Instruct/checkpoint-163384"
+python aime_qwen_benchmark.py --load_path "weights/denim-meadow-236/Output-Qwen-Qwen2.5-Math-7B-Instruct/checkpoint-163384"
+python proocessbench_qwen_benchmark.py --load_path "weights/denim-meadow-236/Output-Qwen-Qwen2.5-Math-7B-Instruct/checkpoint-163384"
 
 pip install --upgrade transformers
 
