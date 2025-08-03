@@ -172,6 +172,10 @@ for dataset in process_benchmark:
         correctness = 1 if correctness else 0
         all_problem_correctness+=[correctness]
         if special_tokens:
+            t = 1
+            for i in step_rewards:
+                t*=i    
+            print(sum(step_rewards)/len(step_rewards), t, t**(1/len(step_rewards)))
             a = step_rewards[-1]
         else:
             a = score
