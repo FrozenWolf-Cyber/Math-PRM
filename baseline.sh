@@ -2,14 +2,14 @@
 
 {
 
-	qwen2.5-7B_clf_acc8_baseline_newtoken_deep-cloud-246
-echo "Running: qwen2.5-7B_clf_acc8_baseline_newtoken_deep-cloud-246"
-python aime_myprm_benchmark.py --load_path weights/deep-cloud-246 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct
-sleep 2
-python myprm_qwen_benchmark.py --load_path weights/deep-cloud-246 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct
-sleep 2
-python proocessbench_myprm_qwen_benchmark.py --load_path weights/deep-cloud-246 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct
-sleep 2
+# 	qwen2.5-7B_clf_acc8_baseline_newtoken_deep-cloud-246
+# echo "Running: qwen2.5-7B_clf_acc8_baseline_newtoken_deep-cloud-246"
+# python aime_myprm_benchmark.py --load_path weights/deep-cloud-246 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct
+# sleep 2
+# python myprm_qwen_benchmark.py --load_path weights/deep-cloud-246 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct
+# sleep 2
+# python proocessbench_myprm_qwen_benchmark.py --load_path weights/deep-cloud-246 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct
+# sleep 2
 
 
 
