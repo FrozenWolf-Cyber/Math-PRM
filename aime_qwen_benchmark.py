@@ -5,6 +5,24 @@ from tqdm.auto import tqdm
 ds = load_data_custom("FrozenWolf/prm800k")
 dst = ds['test'].to_pandas()
 
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+from peft import PeftModel, PeftConfig
+import torch, os
+import argparse
+parser = argparse.ArgumentParser(description="Model Configuration Arguments")
+parser.add_argument("--load_path", type=str, default="", help="Path to load model from")
+args = parser.parse_args()
+SEP_TOKEN = '<PRM_STEP_SCORE>'
+def chat_template( question, steps):
+        global SEP_TOKEN
+        steps = f' {SEP_TOKEN} \n'.join(steps)
+        
+        prompt = f'''Question:
+{question}
+Answer:
+{steps} {SEP_TOKEN}'''
+        
+        return prompt
 
 import pandas as pd
 def select_top_20(group):
@@ -55,16 +73,22 @@ def make_step_rewards(logits, token_masks):
 
 
 def evaluate_question_stepwise(model, tokenizer, system_prompt, question, stepwise_solution):
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": question},
-        {"role": "assistant", "content": "<extra_0>".join(stepwise_solution) + "<extra_0>"},
-    ]
-    conversation_str = tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=False
-    )
+    
+    if args.load_path=="":
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": "<extra_0>".join(stepwise_solution) + "<extra_0>"},
+        ]
+        conversation_str = tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=False
+        )
+        step_sep_id = tokenizer.encode("<extra_0>")[0]
+    else:
+        step_sep_id = tokenizer.encode("<PRM_STEP_SCORE>")[0]
+        conversation_str = chat_template(question, stepwise_solution)
     
     # print("Conversation String:", conversation_str)
     
@@ -73,7 +97,7 @@ def evaluate_question_stepwise(model, tokenizer, system_prompt, question, stepwi
         return_tensors="pt"
     ).to(model.device)
 
-    step_sep_id = tokenizer.encode("<extra_0>")[0]
+    
     token_masks = (input_ids == step_sep_id)
 
     with torch.no_grad():
@@ -82,15 +106,34 @@ def evaluate_question_stepwise(model, tokenizer, system_prompt, question, stepwi
 
     return step_rewards[0]
 
+checkpoint_path = args.load_path
+model_name = checkpoint_path
+if checkpoint_path=="":
+    model_name = "Qwen/Qwen2.5-Math-PRM-7B"
+    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+    model = AutoModel.from_pretrained(
+        model_name,
+        device_map="auto",
+        torch_dtype=torch.bfloat16,
+        trust_remote_code=True
+    ).to("cuda").eval()
 
-model_name = "Qwen/Qwen2.5-Math-PRM-7B"
-tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-model = AutoModel.from_pretrained(
-    model_name,
-    device_map="auto",
-    torch_dtype=torch.bfloat16,
-    trust_remote_code=True
-).eval()
+else:
+    # Load tokenizer from checkpoint (has added tokens)
+    tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
+
+    # Load model from checkpoint (this will include any adapter if saved properly)
+    model = AutoModelForTokenClassification.from_pretrained(checkpoint_path)
+    print("Loaded model from checkpoint:", checkpoint_path)
+    # If PEFT/LoRA was used (check if adapter_config.json and adapter_model.safetensors exist)
+    # Then wrap with PEFT model
+    if os.path.exists(f"{checkpoint_path}/adapter_config.json"):
+        model = PeftModel.from_pretrained(model, checkpoint_path)
+        print("Loaded with LoRA adapter")
+
+    # Move to GPU if needed
+    model = model.cuda()
+    model.eval()
 
 
 import os
@@ -124,6 +167,7 @@ for ds in os.listdir(paths):
         output["subject"] = "Others" ## filler values
         
         all_problem_pred = []
+        step_rewards_history = []
         for questions, solutions in tqdm(zip(output['problem'].tolist(), output['completions'].tolist()), total=len(output)):
             step_rewards = evaluate_question_stepwise(
                 model=model,
@@ -134,12 +178,17 @@ for ds in os.listdir(paths):
             )
 
             all_problem_pred+=[step_rewards[-1]]
+            step_rewards_history.append(step_rewards)
             
         predictions, score = eval(output, all_problem_pred, ds)
         print(f"Model {model_out} on dataset {ds} has score {score}")
-        prediction_history[ds][model_out] = predictions
+        prediction_history[ds][model_out] = [predictions, step_rewards_history]
         
         
+
+import os
+wandb_name = args.load_path.split("/")[-1]
+name = f"aime_prediction_history_{wandb_name}.pkl"
 import pickle
-with open("aime_prediction_history.pkl", "wb") as f:
+with open(name, 'wb') as f:
     pickle.dump(prediction_history, f)
