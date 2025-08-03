@@ -215,7 +215,11 @@ for questions, solutions, step_labels, correctness in tqdm(zip(
     all_step_labels+= [1 if i else 0 for i in step_labels.tolist()]
     all_problem_correctness+=[correctness]
     if special_tokens:
-        a = step_rewards[-1]
+        t = 1
+        for i in step_rewards:
+            t*=i    
+        print(sum(step_rewards)/len(step_rewards), t, t**(1/len(step_rewards)))
+        a = t
     else:
         a = score
     all_problem_pred+=[1 if a>=0.5 else 0]
