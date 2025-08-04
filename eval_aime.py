@@ -28,21 +28,33 @@ def parse_list(arg):
 
 def eval(dataset, predictions, ds_name):
     selected_responses = []
-    curr_index = -1
+    curr_index = 0
     best_score = -10000
     selected_response = None
     for response, problem_index, pred in zip(dataset['completions'], dataset['index'], predictions):
+        # print(f"Problem index: {problem_index}, Pred: {pred} Extracted response:",extract_answer('\n\n'.join(response), ds_name))
         if curr_index!= problem_index:
+            # print("Inserting new response")
+            # print(curr_index)
+            selected_response = ['\n\n'.join(selected_response)]
+            selected_responses.append({"generated_responses":selected_response})
             best_score = -10000
             selected_response = response
             curr_index = problem_index
-            if curr_index != -1:
-                selected_responses.append({"generated_responses":selected_response})
         else:
             if pred > best_score:
                 best_score = pred
+                # print(f"New best score: {best_score} for problem index: {problem_index}")
                 selected_response = response
 
+    # print("Inserting new response")
+    selected_response = response
+    curr_index = problem_index
+    selected_response = ['\n\n'.join(selected_response)]
+    selected_responses.append({"generated_responses":selected_response})
+
+    answers = [extract_answer('\n\n'.join(res['generated_responses']) if res['generated_responses'] else '', ds_name) for res in selected_responses]
+    print(len(selected_responses), answers)
     return infer(selected_responses, split=ds_name, k=1)
 
 
@@ -58,7 +70,7 @@ def get_majority_voting(list_ans):
         return sorted_answers[0][0]
 
 def infer(file_outputs, data_name = "aime", split = "test", data_dir = "./", start_idx = 0, end_idx = -1, k = 1):
-
+    print(f"Evaluating {data_name} {split} with k={k}")
     examples = load_data(data_name, split, data_dir)
     if end_idx == -1:
         end_idx = len(examples)
@@ -68,11 +80,13 @@ def infer(file_outputs, data_name = "aime", split = "test", data_dir = "./", sta
     k = k
     correct_cnt = 0
     majorty_voting_is_correct_cnt = 0
-    
+    a = []
     for i in range(len(file_outputs)):
         d = examples[i]
         gt_cot, gt_ans = parse_ground_truth(d, data_name)
-        generated_responses = ['\n'.join(file_outputs[i]['generated_responses'])]
+        generated_responses = file_outputs[i]['generated_responses']
+        a.append(gt_ans)
+        # generated_responses = ['\n'.join(file_outputs[i]['generated_responses'])]
         generated_answers = [extract_answer(generated_response, data_name) for generated_response in generated_responses]
         majorty_voting = get_majority_voting(generated_answers)
         is_correct_list = [check_is_correct(generated_answer, gt_ans) for generated_answer in generated_answers]
@@ -102,7 +116,7 @@ def infer(file_outputs, data_name = "aime", split = "test", data_dir = "./", sta
             else:
                 pass_at_k_list.append(0)
                 
-
+    print(a)
 
     print(f"Pass@{len(generated_answers)}:  {correct_cnt}/{len(examples)} = {correct_cnt / len(examples):.4f}")
     print(f"Consensus (majority voting): {majorty_voting_is_correct_cnt}/{len(examples)} = {majorty_voting_is_correct_cnt / len(examples):.4f}")
