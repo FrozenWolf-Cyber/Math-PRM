@@ -239,7 +239,7 @@ print("Last Step-wise Metrics:", step_metrics)
 ## save with unique name
 import os
 wandb_name = args.load_path.split("/")[-1]
-name = f"my_qwen_laststep_benchmark_history_{wandb_name}.pkl"
+name = f"step_my_qwen_laststep_benchmark_history_{wandb_name}.pkl"
 import pickle
 with open(name, 'wb') as f:
     pickle.dump(history, f)
