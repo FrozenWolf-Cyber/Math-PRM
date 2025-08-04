@@ -46,7 +46,7 @@ echo "Running: qwen2.5-7B_clf_acc8_baseline_newtoken_silver-dawn-238"
 python step_myprm_qwen.py --load_path weights/silver-dawn-238 --peft_rank 16 --lora_dropout 0 --add_new_token --model_type classifier --reward_model Qwen/Qwen2.5-Math-7B-Instruct
 sleep 2
 
-	qwen2.5-7B_token_acc16_baseline_lr1e-4_dropout0
+	# qwen2.5-7B_token_acc16_baseline_lr1e-4_dropout0
 echo "Running: qwen2.5-7B_token_acc16_baseline_lr1e-4_dropout0"
 # python aime_myprm_benchmark.py --load_path weights/elated-cosmos-198 --peft_rank 16 --lora_dropout 0 --special_tokens --model_type token --reward_model Qwen/Qwen2.5-Math-7B-Instruct --freeze_all_but_bias
 # sleep 2
