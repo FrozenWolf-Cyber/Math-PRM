@@ -437,6 +437,9 @@ class Lower(ImplicitProblem):
         model.base_model = model.base_model.to(device)
         model.LN = model.LN.to(device)
         print("Lower model configured with device:", model.base_model.device)
+        for name, param in model.named_parameters():
+            print(name, param.dtype)
+
         return model
 
 
