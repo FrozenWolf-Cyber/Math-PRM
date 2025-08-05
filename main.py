@@ -66,13 +66,21 @@ parser.add_argument("--load_path", type=str, default="", help="Path to load the 
 parser.add_argument("--evaluate_only", action="store_true")
 parser.add_argument("--balance", action="store_true")
 
+def get_rank():
+    if "RANK" in os.environ:
+        return int(os.environ["RANK"])
+    elif "LOCAL_RANK" in os.environ:
+        return int(os.environ["LOCAL_RANK"])
+    else:
+        return 0
 
-if "RANK" in os.environ and "LOCAL_RANK" in os.environ:
-    print(f"[RANK={os.environ['RANK']}, LOCAL_RANK={os.environ['LOCAL_RANK']}] Hello from GPU {torch.cuda.current_device()}")
-
+print(f"Hello from GPU {get_rank()}")
 
 
 args = parser.parse_args()
+
+ddp_true = args.strategy!= "default"
+
 print(args)
 set_seed(args.seed)
 domain_list = {'Algebra':0,
@@ -153,19 +161,20 @@ resume_labels = None
 ### log the configurations to wandb
 mode = args.wandb_mode
 
-wandb.init(project="DreamPRM-AIME", mode=mode, config=args)
+if get_rank()==0:
+    wandb.init(project="DreamPRM-AIME", mode=mode, config=args)
 
-if not sanity_check:
-    run_name = wandb.run.name
-    print(f"Run name: {run_name}")
-    if run_name is None:
-        run_name = "default_run"
-    ### edit the save path to include the run name
-    args.weights_path = os.path.join(args.weights_path, run_name)
-    if not os.path.exists(args.weights_path):
-        os.makedirs(args.weights_path)
+    if not sanity_check:
+        run_name = wandb.run.name
+        print(f"Run name: {run_name}")
+        if run_name is None:
+            run_name = "default_run"
+        ### edit the save path to include the run name
+        args.weights_path = os.path.join(args.weights_path, run_name)
+        if not os.path.exists(args.weights_path):
+            os.makedirs(args.weights_path)
 
-device = torch.device(args.device)
+device = torch.device(args.device) if not ddp_true else torch.device(f"cuda:{get_rank()}")
 criterion = nn.MSELoss(reduction='none')
 criterion_meta = nn.MSELoss()
 criterion_CE = nn.BCEWithLogitsLoss(reduction='none')
@@ -286,7 +295,8 @@ class Upper(ImplicitProblem):
         if len(upper_loss) == 5:
             mean_outer_loss = np.mean(upper_loss)
             print(f"Outer Loss: {mean_outer_loss}")
-            wandb.log({"outer_loss": mean_outer_loss})
+            if get_rank()==0:
+                wandb.log({"outer_loss": mean_outer_loss})
             upper_loss.clear()
 
         return {"loss": loss}
@@ -384,7 +394,8 @@ class Lower(ImplicitProblem):
         
         if args.baseline or args.retrain:
             loss = torch.mean(loss)  # (B, )    
-            wandb.log({"inner_loss": loss.cpu().item(),})
+            if get_rank()==0:
+                wandb.log({"inner_loss": loss.cpu().item(),})
             return loss
 
         loss = loss.unsqueeze(1)  # (B, 1)
