@@ -489,6 +489,7 @@ class ReweightingEngine(Engine):
             gt+=[metric_preds['gt'][-1]]
             problem_pred+= metric_preds['problem_pred']
             correctness+= metric_preds['correctness']
+            print("All lengths are:", len(step_pred), len(gt), len(problem_pred), len(correctness))
 
             
         step_metrics = binary_classification_metrics(step_pred, gt) ## dict of metrics
