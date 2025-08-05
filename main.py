@@ -627,8 +627,8 @@ engine_config = EngineConfig(
     roll_back=args.rollback,
     logger_type="wandb",
 )
-upper = Upper(name="upper", config=upper_config)
-lower = Lower(name="lower", config=lower_config)
+upper = Upper(name="upper", config=upper_config, ddp_check_parameters=False)
+lower = Lower(name="lower", config=lower_config, ddp_check_parameters=False)
 
 if args.baseline or args.retrain:
     problems = [lower]
@@ -661,4 +661,6 @@ else:
         torch.distributed.barrier()  # Ensure all processes complete validation before starting training
     else:
         print("Skipping initial validation for sanity check or overfit mode")
+        
+    print("\n\n",'---'*5, "Starting training...", '---'*5, )
     engine.run()
