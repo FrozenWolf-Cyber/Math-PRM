@@ -477,8 +477,8 @@ class ReweightingEngine(Engine):
             nbatchsize = len(batch['input_ids'])
             
             ## getting last sample from the batch for validation
-            print(batch['labels'].shape, batch['correctness'].shape, batch['input_ids'].shape, batch['attention_mask'].shape)
-            batch['labels'] = batch['label'][-1:]  # Get the last label for the batch
+            print(batch['label'].shape, batch['correctness'].shape, batch['input_ids'].shape, batch['attention_mask'].shape)
+            batch['label'] = batch['label'][-1:]  # Get the last label for the batch
             batch['correctness'] = batch['correctness'][-1:]  # Get the last correctness for the batch
             batch['input_ids'] = batch['input_ids'][-1:]  # Get the last input_ids for the batch
             batch['attention_mask'] = batch['attention_mask'][-1:]
