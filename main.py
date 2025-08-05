@@ -486,7 +486,10 @@ class ReweightingEngine(Engine):
             score = unbatch_process(batch, device, self.lower, max_step_size, no_grad=True).cpu()
 
             outputs, metric_preds = get_pred(args, batch, score)
-            step_pred+=metric_preds['step_pred']
+            if args.model_type == "token":
+                step_pred+= metric_preds['step_pred'][-1:]  # Get the last step prediction for the batch
+            else:
+                step_pred+=metric_preds['step_pred']
             gt+=[metric_preds['gt'][-1]]
             problem_pred+= metric_preds['problem_pred']
             correctness+= metric_preds['correctness']
