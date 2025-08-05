@@ -180,6 +180,7 @@ mode = args.wandb_mode
 
 if get_rank()==0:
     wandb.init(project="DreamPRM-AIME", mode=mode, config=args)
+    pbar = tqdm(total=args.iteration_num, desc="Training Progress")
 
     if not sanity_check:
         run_name = wandb.run.name
@@ -346,6 +347,7 @@ class Lower(ImplicitProblem):
     def training_step(self, batch):
         global iter_num
         iter_num+=1
+        pbar.update(1)
         labels = batch['label'].to(dtype=torch.float).to(device)
         # print("Lower shapes", batch['input_ids'].shape, labels.shape, batch['correctness'])
         domain_strings = batch['dataset']
