@@ -494,10 +494,17 @@ class ReweightingEngine(Engine):
         
         
         if (args.overfit == -1) and (not args.sanity_check):
-            if args.peft_rank != -1:
-                self.lower.module.base_model.save_pretrained(f"{args.weights_path}/lower_weights")
+            if ddp_true:
+                base_model = self.lower.module.module.base_model.module
+                upper_model = self.upper.module
             else:
-                self.lower.module.base_model.save_pretrained(f"{args.weights_path}/lower_weights")
+                base_model = self.lower.module.base_model
+                upper_model = self.upper
+                
+            if args.peft_rank != -1:
+                base_model.save_pretrained(f"{args.weights_path}/lower_weights")
+            else:
+                base_model.save_pretrained(f"{args.weights_path}/lower_weights")
 
             torch.save(self.lower.module.LN.state_dict(), f"{args.weights_path}/lower_weights_LN.pt")
 
@@ -505,10 +512,10 @@ class ReweightingEngine(Engine):
         #### log this domain weights to wandb # self.raw_weights = nn.Parameter(torch.zeros(self.num_domains))
         if not args.baseline:
             torch.save(
-                self.upper.state_dict(),
+                upper_model.state_dict(),
                 f"{args.weights_path}/domain_weights.pt",
             )
-            wts = self.upper.module.raw_weights
+            wts = upper_model.module.raw_weights
             print("Raw Weights:", wts)
             positive_weights = torch.nn.functional.softplus(wts)
             print("Positive Weights:", positive_weights)
