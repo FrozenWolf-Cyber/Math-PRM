@@ -562,9 +562,14 @@ devices_count = torch.cuda.device_count()
 args.iteration_num = (args.epoch * len(train_dataloader))/ devices_count
 print(f"Total devices: {devices_count} Total iterations (epoch*len/devices): {args.iteration_num}, Epochs: {args.epoch}, Train Dataloader Size: {len(train_dataloader)}")
 
-
+print("Initializing Upper and Lower problems")
+torch.distributed.barrier()
 upper_config = Config(type="darts", precision=args.precision, retain_graph=True, gradient_clipping=args.gradient_clipping, gradient_accumulation=args.gradiant_accumulation)
+torch.distributed.barrier()
 lower_config = Config(type="darts", precision=args.precision, unroll_steps=args.unroll_steps, gradient_accumulation=args.gradiant_accumulation, gradient_clipping=args.gradient_clipping)
+torch.distributed.barrier()
+
+print("Upper config:", upper_config)
 engine_config = EngineConfig(
     train_iters=args.iteration_num,
     valid_step=args.save_every_iterations,
