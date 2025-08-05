@@ -1,6 +1,7 @@
 # All code is original unless otherwise noted.
 
 import argparse
+import torch.distributed
 import torch.optim as optim
 from model import *
 from prm_data import *
@@ -485,132 +486,129 @@ class Lower(ImplicitProblem):
 class ReweightingEngine(Engine):
     @torch.no_grad()
     def validation(self):
-        if get_rank() == 0:
-            global iter_num
-            log_dict = {}
-            step_pred, gt, problem_pred, correctness = [], [], [], []
-            for batch in tqdm(validation_dataloader):
-                if args.max_step_size == -1:
-                    max_step_size = len(batch['input_ids'])
-                else:
-                    max_step_size = args.max_step_size
+        global iter_num
+        log_dict = {}
+        step_pred, gt, problem_pred, correctness = [], [], [], []
+        for batch in tqdm(validation_dataloader):
+            if args.max_step_size == -1:
+                max_step_size = len(batch['input_ids'])
+            else:
+                max_step_size = args.max_step_size
+                
+            nbatchsize = len(batch['input_ids'])
+            
+            ## getting last sample from the batch for validation
+            # print(batch['label'].shape, batch['correctness'], batch['input_ids'].shape, batch['attention_mask'].shape)
+            batch['label'] = batch['label'][-1:]  # Get the last label for the batch
+            batch['correctness'] = batch['correctness'][-1:]  # Get the last correctness for the batch
+            batch['input_ids'] = batch['input_ids'][-1:]  # Get the last input_ids for the batch
+            batch['attention_mask'] = batch['attention_mask'][-1:]
+            
+            score = unbatch_process(batch, device, self.lower, max_step_size, no_grad=True).cpu()
 
-                nbatchsize = len(batch['input_ids'])
+            outputs, metric_preds = get_pred(args, batch, score)
+            if args.model_type == "token":
+                step_pred+= metric_preds['step_pred'][-1:]  # Get the last step prediction for the batch
+            else:
+                step_pred+=metric_preds['step_pred']
+            gt+=[metric_preds['gt'][-1]]
+            problem_pred+= metric_preds['problem_pred']
+            correctness+= metric_preds['correctness']
+            # print("All lengths are:", len(step_pred), len(gt), len(problem_pred), len(correctness))
 
-                ## getting last sample from the batch for validation
-                # print(batch['label'].shape, batch['correctness'], batch['input_ids'].shape, batch['attention_mask'].shape)
-                batch['label'] = batch['label'][-1:]  # Get the last label for the batch
-                batch['correctness'] = batch['correctness'][-1:]  # Get the last correctness for the batch
-                batch['input_ids'] = batch['input_ids'][-1:]  # Get the last input_ids for the batch
-                batch['attention_mask'] = batch['attention_mask'][-1:]
+            
+        step_metrics = binary_classification_metrics(step_pred, gt) ## dict of metrics
+        problem_metrics = binary_classification_metrics(problem_pred, correctness) ## dict of metrics
+        
+        print("Step Metrics:", step_metrics)
+        print("Problem Metrics:", problem_metrics)
+        
+        log_dict = {f"step_{k}": v for k, v in step_metrics.items()}
+        log_dict.update({f"problem_{k}": v for k, v in problem_metrics.items()})
+        
+        step_save = False
+        if iter_num % save_every == 0:
+            print(f"Saving lower weights at iteration {iter_num} to {args.weights_path}/lower_weights")
+            step_name = (iter_num+1) // save_every
+            step_save = True   
+        if (args.overfit == -1) and (not args.sanity_check) and iter_num!=0:
+            if ddp_true:
+                base_model = self.lower.module.module.base_model.module
+            else:
+                base_model = self.lower.module.base_model
+                
 
-                score = unbatch_process(batch, device, self.lower, max_step_size, no_grad=True).cpu()
+            base_model.save_pretrained(f"{args.weights_path}/lower_weights")
+            torch.save(self.lower.module.LN.state_dict(), f"{args.weights_path}/lower_weights_LN.pt")
 
-                outputs, metric_preds = get_pred(args, batch, score)
-                if args.model_type == "token":
-                    step_pred+= metric_preds['step_pred'][-1:]  # Get the last step prediction for the batch
-                else:
-                    step_pred+=metric_preds['step_pred']
-                gt+=[metric_preds['gt'][-1]]
-                problem_pred+= metric_preds['problem_pred']
-                correctness+= metric_preds['correctness']
-                # print("All lengths are:", len(step_pred), len(gt), len(problem_pred), len(correctness))
-
-
-            step_metrics = binary_classification_metrics(step_pred, gt) ## dict of metrics
-            problem_metrics = binary_classification_metrics(problem_pred, correctness) ## dict of metrics
-
-            print("Step Metrics:", step_metrics)
-            print("Problem Metrics:", problem_metrics)
-
-            log_dict = {f"step_{k}": v for k, v in step_metrics.items()}
-            log_dict.update({f"problem_{k}": v for k, v in problem_metrics.items()})
-
-            step_save = False
-            if iter_num % save_every == 0:
-                print(f"Saving lower weights at iteration {iter_num} to {args.weights_path}/lower_weights")
-                step_name = (iter_num+1) // save_every
-                step_save = True   
-            if (args.overfit == -1) and (not args.sanity_check) and iter_num!=0:
-                if ddp_true:
-                    base_model = self.lower.module.module.base_model.module
-                else:
-                    base_model = self.lower.module.base_model
-
-
-                base_model.save_pretrained(f"{args.weights_path}/lower_weights")
-                torch.save(self.lower.module.LN.state_dict(), f"{args.weights_path}/lower_weights_LN.pt")
-
-                if step_save:
-                    print(f"Saving last step weights at iteration {iter_num} to {args.weights_path}/lower_weights_step.pt") 
-                    base_model.save_pretrained(f"{args.weights_path}/lower_weights_step_{step_name}")
-                    torch.save(self.lower.module.LN.state_dict(), f"{args.weights_path}/lower_weights_LN_step_{step_name}.pt")
-
-            #### log this domain weights to wandb # self.raw_weights = nn.Parameter(torch.zeros(self.num_domains))
-            if not args.baseline:
-                if ddp_true:
-                    upper_model = self.upper.module
-                else:
-                    upper_model = self.upper
+            if step_save:
+                print(f"Saving last step weights at iteration {iter_num} to {args.weights_path}/lower_weights_step.pt") 
+                base_model.save_pretrained(f"{args.weights_path}/lower_weights_step_{step_name}")
+                torch.save(self.lower.module.LN.state_dict(), f"{args.weights_path}/lower_weights_LN_step_{step_name}.pt")
+        
+        #### log this domain weights to wandb # self.raw_weights = nn.Parameter(torch.zeros(self.num_domains))
+        if not args.baseline:
+            if ddp_true:
+                upper_model = self.upper.module
+            else:
+                upper_model = self.upper
+            torch.save(
+                upper_model.state_dict(),
+                f"{args.weights_path}/domain_weights.pt",
+            )
+            
+            if step_save:
+                print(f"Saving upper weights at iteration {iter_num} to {args.weights_path}/domain_weights.pt")
                 torch.save(
                     upper_model.state_dict(),
-                    f"{args.weights_path}/domain_weights.pt",
-                )
+                    f"{args.weights_path}/domain_weights_step_{step_name}.pt",)
+            
+            wts = upper_model.module.raw_weights
+            print("Raw Weights:", wts)
+            positive_weights = torch.nn.functional.softplus(wts)
+            print("Positive Weights:", positive_weights)
+            mean_weights = positive_weights.mean()
+            wts = (positive_weights / mean_weights).cpu().numpy()
 
-                if step_save:
-                    print(f"Saving upper weights at iteration {iter_num} to {args.weights_path}/domain_weights.pt")
-                    torch.save(
-                        upper_model.state_dict(),
-                        f"{args.weights_path}/domain_weights_step_{step_name}.pt",)
+            print("Domain Weights:", wts)
+            ### separate line for each domain
+            to_log = {inv_domain_list[i]: wts[i] for i in range(len(domain_list))}
+            wandb.log(to_log)
+            
 
-                wts = upper_model.module.raw_weights
-                print("Raw Weights:", wts)
-                positive_weights = torch.nn.functional.softplus(wts)
-                print("Positive Weights:", positive_weights)
-                mean_weights = positive_weights.mean()
-                wts = (positive_weights / mean_weights).cpu().numpy()
+        all_scores = {}
+        for ds_name in dataloader_benchmark:
+            for model_name in tqdm(dataloader_benchmark[ds_name]):
+                print(f"Evaluating {ds_name} with {model_name}")
+                test_dataloader = dataloader_benchmark[ds_name][model_name]
+                predictions = None
+                
+                for batch in test_dataloader:
+                    if args.max_step_size == -1:
+                        max_step_size = len(batch['input_ids'])
+                    else:
+                        max_step_size = args.max_step_size
+                    score = unbatch_process(batch, device, self.lower, max_step_size, no_grad=True).cpu()
+      
+                    outputs, _ = get_pred(args, batch, score)
 
-                print("Domain Weights:", wts)
-                ### separate line for each domain
-                to_log = {inv_domain_list[i]: wts[i] for i in range(len(domain_list))}
-                wandb.log(to_log)
+                    outputs = outputs.to(dtype=torch.float32)
+                    if predictions is None:
+                        predictions = outputs.numpy()
+                    else:
+                        predictions = np.concatenate((predictions, outputs.numpy()), axis=0)
 
+                dataset = test_dataloader.dataset.dataset
+                predictions, score = eval(dataset, predictions, ds_name)
 
-            all_scores = {}
-            for ds_name in dataloader_benchmark:
-                for model_name in tqdm(dataloader_benchmark[ds_name]):
-                    print(f"Evaluating {ds_name} with {model_name}")
-                    test_dataloader = dataloader_benchmark[ds_name][model_name]
-                    predictions = None
+                print(f"Dataset: {ds_name}, Model: {model_name}, Score: {score}")
+                df = pd.DataFrame(predictions)
+                df.to_csv(f"{args.weights_path}/{ds_name}_{model_name.split('/')[-1]}_predictions.csv", index=False)
+                log_dict.update({f"{ds_name}/{model_name}_score": score})
+                all_scores[f"{ds_name}_{model_name}"] = score
+                
+        wandb.log(log_dict)
 
-                    for batch in test_dataloader:
-                        if args.max_step_size == -1:
-                            max_step_size = len(batch['input_ids'])
-                        else:
-                            max_step_size = args.max_step_size
-                        score = unbatch_process(batch, device, self.lower, max_step_size, no_grad=True).cpu()
-
-                        outputs, _ = get_pred(args, batch, score)
-
-                        outputs = outputs.to(dtype=torch.float32)
-                        if predictions is None:
-                            predictions = outputs.numpy()
-                        else:
-                            predictions = np.concatenate((predictions, outputs.numpy()), axis=0)
-
-                    dataset = test_dataloader.dataset.dataset
-                    predictions, score = eval(dataset, predictions, ds_name)
-
-                    print(f"Dataset: {ds_name}, Model: {model_name}, Score: {score}")
-                    df = pd.DataFrame(predictions)
-                    df.to_csv(f"{args.weights_path}/{ds_name}_{model_name.split('/')[-1]}_predictions.csv", index=False)
-                    log_dict.update({f"{ds_name}/{model_name}_score": score})
-                    all_scores[f"{ds_name}_{model_name}"] = score
-
-            wandb.log(log_dict)
-        else:
-            print("Skipping validation as not on rank 0")
-            all_scores = {}
 
         all_scores["loss"] = 1
         return all_scores
@@ -648,11 +646,14 @@ print("Overfit value:", args.overfit)
 print("Sanity check value:", args.sanity_check)
 
 if args.evaluate_only:
-    engine.validation()
+    if get_rank() == 0:
+        engine.validation()
 else:
     if (not args.sanity_check) and (args.overfit==-1):
         ### Initial validation results
-        engine.validation()
+        if get_rank() == 0:
+            engine.validation()
+        torch.distributed.barrier()  # Ensure all processes complete validation before starting training
     else:
         print("Skipping initial validation for sanity check or overfit mode")
     engine.run()
