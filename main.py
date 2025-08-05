@@ -542,7 +542,7 @@ class ReweightingEngine(Engine):
 
 ## set iteration number to epoch*train dataloader size
 devices_count = torch.cuda.device_count()
-args.iteration_num = args.epoch * len(train_dataloader)
+args.iteration_num = (args.epoch * len(train_dataloader))/ devices_count
 print(f"Total devices: {devices_count} Total iterations (epoch*len/devices): {args.iteration_num}, Epochs: {args.epoch}, Train Dataloader Size: {len(train_dataloader)}")
 
 
