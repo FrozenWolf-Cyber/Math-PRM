@@ -525,8 +525,8 @@ def build_dataloader(
     # Step 4: Filter all original rows that belong to the sampled question_numbers
     dst_selected = df_shuffled[df_shuffled['qindex'].isin(sampled_questions['qindex'])]
     print(dst_selected.last_label.value_counts(), dst_selected.subject.value_counts())
-    dst.drop(['__index_level_0__'], axis=1, inplace=True, errors='ignore')
-    validation = HF_Dataset.from_pandas(dst)
+    dst_selected.drop(['__index_level_0__'], axis=1, inplace=True, errors='ignore')
+    validation = HF_Dataset.from_pandas(dst_selected)
 
     
     if not token_based:
