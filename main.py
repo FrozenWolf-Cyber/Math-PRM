@@ -20,7 +20,8 @@ from peft import PeftModel
  
 parser = argparse.ArgumentParser(description="DreamPRM")
 parser.add_argument('--weights_path', type=str)
-parser.add_argument("--iteration_num", type=int, default=10000)
+parser.add_argument("--iteration_num", type=int, default=100000)
+parser.add_argument("--epoch", type=int, default=5)
 parser.add_argument("--save_every_iterations", type=int, default=5000)
 parser.add_argument("--unroll_steps", type=int, default=5)
 parser.add_argument("--gradiant_accumulation", type=int, default=1)
@@ -64,6 +65,11 @@ parser.add_argument("--lora_dropout", type=float, default=0.05, help="Dropout fo
 parser.add_argument("--load_path", type=str, default="", help="Path to load the model from")
 parser.add_argument("--evaluate_only", action="store_true")
 parser.add_argument("--balance", action="store_true")
+
+
+if "RANK" in os.environ and "LOCAL_RANK" in os.environ:
+    print(f"[RANK={os.environ['RANK']}, LOCAL_RANK={os.environ['LOCAL_RANK']}] Hello from GPU {torch.cuda.current_device()}")
+
 
 
 args = parser.parse_args()
@@ -432,11 +438,11 @@ class Lower(ImplicitProblem):
         )
         return optimizer
 
-    # def configure_scheduler(self):
-    #     scheduler = optim.lr_scheduler.StepLR(
-    #         self.optimizer, step_size = args.scheduler_step_size, gamma=args.scheduler_gamma
-    #     )
-    #     return scheduler
+    def configure_scheduler(self):
+        scheduler = optim.lr_scheduler.StepLR(
+            self.optimizer, step_size = args.scheduler_step_size, gamma=args.scheduler_gamma
+        )
+        return scheduler
 
 
 
@@ -533,6 +539,11 @@ class ReweightingEngine(Engine):
 
         all_scores["loss"] = 1
         return all_scores
+
+## set iteration number to epoch*train dataloader size
+devices_count = torch.cuda.device_count()
+args.iteration_num = args.epoch * len(train_dataloader)
+print(f"Total devices: {devices_count} Total iterations (epoch*len/devices): {args.iteration_num}, Epochs: {args.epoch}, Train Dataloader Size: {len(train_dataloader)}")
 
 
 upper_config = Config(type="darts", precision=args.precision, retain_graph=True, gradient_clipping=args.gradient_clipping, gradient_accumulation=args.gradiant_accumulation)
