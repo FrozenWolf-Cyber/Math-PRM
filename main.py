@@ -162,8 +162,16 @@ resume_labels = None
 ## set iteration number to epoch*train dataloader size
 devices_count = torch.cuda.device_count()
 args.iteration_num = int((args.epoch * len(train_dataloader))/ devices_count)
+print("\n\n","---------------"*10)
 print(f"Total devices: {devices_count} Total iterations (epoch*len/devices): {args.iteration_num}, Epochs: {args.epoch}, Train Dataloader Size: {len(train_dataloader)}")
 save_every = args.iteration_num //args.save_weights_n_times
+print(f"Saving weights at steps: {[i for i in range(0, args.iteration_num, save_every)]}")
+step_size=args.iteration_num // args.scheduler_steps
+print("Step Learning Rate Scheduler Steps:", args.scheduler_steps, "Step Size:", step_size, "Gamma:", args.scheduler_gamma)
+for i in range(args.scheduler_steps+1):
+    print(f"Step {i*step_size} LR: {args.lr * (args.scheduler_gamma ** i)}")
+print("---------------"*10, "\n\n")
+
 ### log the configurations to wandb
 mode = args.wandb_mode
 
