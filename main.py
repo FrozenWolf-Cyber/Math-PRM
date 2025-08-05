@@ -84,7 +84,8 @@ args = parser.parse_args()
 
 ddp_true = args.strategy!= "default"
 
-print(args)
+if get_rank() == 0:
+    print(args)
 set_seed(args.seed)
 domain_list = {'Algebra':0,
  'Counting & Probability':1,
@@ -108,7 +109,7 @@ else:
 
 inv_domain_list = {v: k for k, v in domain_list.items()}
 
-print(domain_list)
+
 sanity_check = args.sanity_check
 if sanity_check:
     print("============ SANITY CHECK MODE ============")
