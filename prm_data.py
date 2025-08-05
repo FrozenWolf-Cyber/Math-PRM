@@ -489,9 +489,42 @@ def build_dataloader(
             
     dst = validation.to_pandas()
     dst = dst.copy()
-    dst['label_len'] = dst['labels'].apply(len)  # compute length of each labels list
-    dst = dst.groupby('subject', group_keys=False).apply(select_top_20)
-    dst = dst.drop(columns='label_len').reset_index(drop=True)
+    # dst['label_len'] = dst['labels'].apply(len)  # compute length of each labels list
+    # dst = dst.groupby('subject', group_keys=False).apply(select_top_20)
+    # dst = dst.drop(columns='label_len').reset_index(drop=True)
+    # dst.drop(['__index_level_0__'], axis=1, inplace=True, errors='ignore')
+    # validation = HF_Dataset.from_pandas(dst)
+
+    dst['qindex'] = dst.index
+
+    def cumulative_lists(lst):
+        return [lst[:i+1] for i in range(len(lst))]
+
+    # Apply to the completions column and explode
+    dst['cumulative_completions'] = dst['completions'].apply(cumulative_lists)
+    dst['cum_labels'] = dst['labels'].apply(cumulative_lists)
+    dst = dst.explode(['cum_labels', 'cumulative_completions'], ignore_index=True)
+
+    dst['completions'] = dst['cumulative_completions']
+    dst['labels'] = dst['cum_labels']
+    dst['last_label'] = dst['labels'].apply(lambda x: x[-1] )
+    dst['qindex'] = dst.index
+    df_shuffled = dst.sample(frac=1, random_state=42).drop_duplicates(subset='qindex')
+
+    # Step 2: Get unique question_number-subject pairs from shuffled df
+    unique_questions = df_shuffled[['qindex', 'subject', 'last_label']]
+
+    # Step 3: Sample n unique questions per subject
+    n = 50
+    sampled_questions = (
+        unique_questions
+        .groupby(['subject','last_label'])
+        .sample(n=n, random_state=42)
+    )
+
+    # Step 4: Filter all original rows that belong to the sampled question_numbers
+    dst_selected = df_shuffled[df_shuffled['qindex'].isin(sampled_questions['qindex'])]
+    print(dst_selected.last_label.value_counts(), dst_selected.subject.value_counts())
     dst.drop(['__index_level_0__'], axis=1, inplace=True, errors='ignore')
     validation = HF_Dataset.from_pandas(dst)
 

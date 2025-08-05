@@ -474,10 +474,19 @@ class ReweightingEngine(Engine):
             else:
                 max_step_size = args.max_step_size
                 
+            nbatchsize = len(batch['input_ids'])
+            
+            ## getting last sample from the batch for validation
+            batch['labels'] = batch['label'][nbatchsize-1:]  # Get the last label for the batch
+            batch['correctness'] = batch['correctness'][nbatchsize-1:]  # Get the last correctness for the batch
+            batch['input_ids'] = batch['input_ids'][nbatchsize-1:]  # Get the last input_ids for the batch
+            batch['attention_mask'] = batch['attention_mask'][nbatchsize-1:]
+            
             score = unbatch_process(batch, device, self.lower, max_step_size, no_grad=True).cpu()
+
             outputs, metric_preds = get_pred(args, batch, score)
             step_pred+=metric_preds['step_pred']
-            gt+=metric_preds['gt']
+            gt+=[metric_preds['gt'][-1]]
             problem_pred+= metric_preds['problem_pred']
             correctness+= metric_preds['correctness']
 
@@ -566,7 +575,7 @@ class ReweightingEngine(Engine):
 
 ## set iteration number to epoch*train dataloader size
 devices_count = torch.cuda.device_count()
-args.iteration_num = (args.epoch * len(train_dataloader))/ devices_count
+args.iteration_num = int((args.epoch * len(train_dataloader))/ devices_count)
 print(f"Total devices: {devices_count} Total iterations (epoch*len/devices): {args.iteration_num}, Epochs: {args.epoch}, Train Dataloader Size: {len(train_dataloader)}")
 
 print("Initializing Upper and Lower problems")
