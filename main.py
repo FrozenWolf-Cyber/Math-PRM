@@ -115,6 +115,7 @@ if sanity_check:
 if not os.path.exists(args.weights_path):
     os.makedirs(args.weights_path)
 
+iter_num = 0
 if sanity_check:
     args.save_every_iterations = 100
     args.iteration_num = 200
@@ -334,13 +335,14 @@ class Upper(ImplicitProblem):
         )
         return meta_optimizer
 
-iter_num = 0
+
 class Lower(ImplicitProblem):
     def forward(self, input_ids, attention_mask, no_grad=False):
         # torch.cuda.empty_cache()
         return self.module(input_ids, attention_mask, no_grad=no_grad)
 
     def training_step(self, batch):
+        global iter_num
         iter_num+=1
         labels = batch['label'].to(dtype=torch.float).to(device)
         # print("Lower shapes", batch['input_ids'].shape, labels.shape, batch['correctness'])
@@ -483,6 +485,7 @@ class Lower(ImplicitProblem):
 class ReweightingEngine(Engine):
     @torch.no_grad()
     def validation(self):
+        global iter_num
         log_dict = {}
         step_pred, gt, problem_pred, correctness = [], [], [], []
         for batch in tqdm(validation_dataloader):
