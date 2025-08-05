@@ -23,6 +23,7 @@ parser.add_argument('--weights_path', type=str)
 parser.add_argument("--iteration_num", type=int, default=100000)
 parser.add_argument("--epoch", type=int, default=5)
 parser.add_argument("--save_every_iterations", type=int, default=5000)
+parser.add_argument("--save_weights_n_times", type=int, default=3)
 parser.add_argument("--unroll_steps", type=int, default=5)
 parser.add_argument("--gradiant_accumulation", type=int, default=1)
 parser.add_argument("--device", type=str, default="cuda")
@@ -35,6 +36,7 @@ parser.add_argument("--seed", type=int, default=1)
 parser.add_argument("--lr", type=float, default=5e-7)
 parser.add_argument("--momentum", type=float, default=0.9)
 parser.add_argument("--scheduler_step_size", type=int, default=5000)
+parser.add_argument("--scheduler_steps", type=int, default=4)
 parser.add_argument("--scheduler_gamma", type=float, default=0.5)
 parser.add_argument("--weight_decay", type=float, default=1e-3)
 parser.add_argument("--meta_lr", type=float, default=0.01)
@@ -157,7 +159,11 @@ resume_labels = None
     balance=args.balance,
 )
 
-
+## set iteration number to epoch*train dataloader size
+devices_count = torch.cuda.device_count()
+args.iteration_num = int((args.epoch * len(train_dataloader))/ devices_count)
+print(f"Total devices: {devices_count} Total iterations (epoch*len/devices): {args.iteration_num}, Epochs: {args.epoch}, Train Dataloader Size: {len(train_dataloader)}")
+save_every = args.iteration_num //args.save_weights_n_times
 ### log the configurations to wandb
 mode = args.wandb_mode
 
@@ -320,15 +326,16 @@ class Upper(ImplicitProblem):
         )
         return meta_optimizer
 
-
+iter_num = 0
 class Lower(ImplicitProblem):
     def forward(self, input_ids, attention_mask, no_grad=False):
         # torch.cuda.empty_cache()
         return self.module(input_ids, attention_mask, no_grad=no_grad)
 
     def training_step(self, batch):
+        iter_num+=1
         labels = batch['label'].to(dtype=torch.float).to(device)
-        print("Lower shapes", batch['input_ids'].shape, labels.shape, batch['correctness'])
+        # print("Lower shapes", batch['input_ids'].shape, labels.shape, batch['correctness'])
         domain_strings = batch['dataset']
         if args.max_step_size == -1:
             max_step_size = len(batch['input_ids'])
@@ -363,7 +370,7 @@ class Lower(ImplicitProblem):
             del mask, labels
                 
         else:
-            print("lower score after clamp", score)
+            # print("lower score after clamp", score)
             # score -> (B, )
             # labels -> (B, T)
             ### take last label that is not -100
@@ -381,8 +388,8 @@ class Lower(ImplicitProblem):
             
             del non_filler, reversed_non_filler, reversed_index, index
         
-        print("DEBUG", "LOWER", loss )
-        print("Loss shape", loss.shape)
+        # print("DEBUG", "LOWER", loss )
+        # print("Loss shape", loss.shape)
         if torch.isnan(loss).any() or torch.isinf(loss).any():
             ## clip the loss to avoid NaN
             print("NaN loss detected, clipping to zero, lower loss")
@@ -412,9 +419,11 @@ class Lower(ImplicitProblem):
         if len(lower_loss) == inner_log_every:
             mean_inner_loss = np.mean(lower_loss)
             mean_inner_weighted_loss = np.mean(lower_weighted_loss)
+            lr = self.optimizer.param_groups[0]['lr']
             wandb.log({"inner_loss": mean_inner_loss,
-                       "inner_weighted_loss": mean_inner_weighted_loss, })
-            print(f"Inner Loss: {mean_inner_loss}, Inner Weighted Loss: {mean_inner_weighted_loss}")
+                       "inner_weighted_loss": mean_inner_weighted_loss, "lr": lr })
+            
+            # print(f"Inner Loss: {mean_inner_loss}, Inner Weighted Loss: {mean_inner_weighted_loss}")
             lower_loss.clear()
             lower_weighted_loss.clear()
         # torch.cuda.empty_cache()
@@ -457,7 +466,7 @@ class Lower(ImplicitProblem):
 
     def configure_scheduler(self):
         scheduler = optim.lr_scheduler.StepLR(
-            self.optimizer, step_size = args.scheduler_step_size, gamma=args.scheduler_gamma
+            self.optimizer, step_size=args.iteration_num // args.scheduler_steps, gamma=args.scheduler_gamma
         )
         return scheduler
 
@@ -505,20 +514,25 @@ class ReweightingEngine(Engine):
         log_dict = {f"step_{k}": v for k, v in step_metrics.items()}
         log_dict.update({f"problem_{k}": v for k, v in problem_metrics.items()})
         
-        
-        if (args.overfit == -1) and (not args.sanity_check):
+        step_save = False
+        if iter_num % save_every == 0:
+            print(f"Saving lower weights at iteration {iter_num} to {args.weights_path}/lower_weights")
+            step_name = (iter_num+1) // save_every
+            step_save = True   
+        if (args.overfit == -1) and (not args.sanity_check) and iter_num!=0:
             if ddp_true:
                 base_model = self.lower.module.module.base_model.module
             else:
                 base_model = self.lower.module.base_model
                 
-            if args.peft_rank != -1:
-                base_model.save_pretrained(f"{args.weights_path}/lower_weights")
-            else:
-                base_model.save_pretrained(f"{args.weights_path}/lower_weights")
 
+            base_model.save_pretrained(f"{args.weights_path}/lower_weights")
             torch.save(self.lower.module.LN.state_dict(), f"{args.weights_path}/lower_weights_LN.pt")
 
+            if step_save:
+                print(f"Saving last step weights at iteration {iter_num} to {args.weights_path}/lower_weights_step.pt") 
+                base_model.save_pretrained(f"{args.weights_path}/lower_weights_step_{step_name}")
+                torch.save(self.lower.module.LN.state_dict(), f"{args.weights_path}/lower_weights_LN_step_{step_name}.pt")
         
         #### log this domain weights to wandb # self.raw_weights = nn.Parameter(torch.zeros(self.num_domains))
         if not args.baseline:
@@ -530,6 +544,13 @@ class ReweightingEngine(Engine):
                 upper_model.state_dict(),
                 f"{args.weights_path}/domain_weights.pt",
             )
+            
+            if step_save:
+                print(f"Saving upper weights at iteration {iter_num} to {args.weights_path}/domain_weights.pt")
+                torch.save(
+                    upper_model.state_dict(),
+                    f"{args.weights_path}/domain_weights_step_{step_name}.pt",)
+            
             wts = upper_model.module.raw_weights
             print("Raw Weights:", wts)
             positive_weights = torch.nn.functional.softplus(wts)
@@ -580,10 +601,6 @@ class ReweightingEngine(Engine):
         all_scores["loss"] = 1
         return all_scores
 
-## set iteration number to epoch*train dataloader size
-devices_count = torch.cuda.device_count()
-args.iteration_num = int((args.epoch * len(train_dataloader))/ devices_count)
-print(f"Total devices: {devices_count} Total iterations (epoch*len/devices): {args.iteration_num}, Epochs: {args.epoch}, Train Dataloader Size: {len(train_dataloader)}")
 
 print("Initializing Upper and Lower problems")
 upper_config = Config(type="darts", precision=args.precision, retain_graph=True, gradient_clipping=args.gradient_clipping, gradient_accumulation=args.gradiant_accumulation)
