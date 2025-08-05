@@ -361,7 +361,7 @@ class Lower(ImplicitProblem):
         score = torch.nan_to_num(score, nan=0.5, posinf=1.0 - 1e-3, neginf=1e-3)
 
        
-        print("lower",score.shape, labels.shape, batch['correctness'])
+        # print("lower",score.shape, labels.shape, batch['correctness'])
         if args.model_type == "token":
             # if args.dreamprm_loss:
             # #     ### dreamprm loss, score -> (B, T,)
