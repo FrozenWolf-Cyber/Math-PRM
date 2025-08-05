@@ -652,7 +652,10 @@ else:
     if (not args.sanity_check) and (args.overfit==-1):
         ### Initial validation results
         if get_rank() == 0:
+            print("Running initial validation for sanity check or overfit mode")
             engine.validation()
+            
+        print("Waiting for all processes to complete initial validation...")
         torch.distributed.barrier()  # Ensure all processes complete validation before starting training
     else:
         print("Skipping initial validation for sanity check or overfit mode")
