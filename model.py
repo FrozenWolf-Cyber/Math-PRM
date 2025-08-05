@@ -201,7 +201,7 @@ def configure_module(args, device):
         )
             model.base_model = get_peft_model(model.base_model, peft_config)
             print("Using PEFT model with LoRA configuration:\n","----"*10)
-            print(peft_config)
+            # print(peft_config)
             print("Trainable parameters in PEFT model:", model.base_model.print_trainable_parameters())
             print("LN parameters:", sum(p.numel() for p in model.LN.parameters() if p.requires_grad))
 
