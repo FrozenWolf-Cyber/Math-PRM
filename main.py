@@ -357,7 +357,7 @@ class Lower(ImplicitProblem):
             ### avg cross entropy loss
             mask = (labels != -100).float()
             labels = torch.clamp(labels, min=0) # (B, T)
-            
+            print("dTYPE", score.dtype, labels.dtype)
             loss = criterion_CE(score, labels)
             loss = loss * mask.float()
             loss = torch.sum(loss, dim=1) / mask.sum(dim=1)  # (B, )
