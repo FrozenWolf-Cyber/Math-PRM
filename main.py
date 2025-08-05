@@ -477,7 +477,7 @@ class ReweightingEngine(Engine):
             nbatchsize = len(batch['input_ids'])
             
             ## getting last sample from the batch for validation
-            print(batch['label'].shape, batch['correctness'], batch['input_ids'].shape, batch['attention_mask'].shape)
+            # print(batch['label'].shape, batch['correctness'], batch['input_ids'].shape, batch['attention_mask'].shape)
             batch['label'] = batch['label'][-1:]  # Get the last label for the batch
             batch['correctness'] = batch['correctness'][-1:]  # Get the last correctness for the batch
             batch['input_ids'] = batch['input_ids'][-1:]  # Get the last input_ids for the batch
@@ -490,7 +490,7 @@ class ReweightingEngine(Engine):
             gt+=[metric_preds['gt'][-1]]
             problem_pred+= metric_preds['problem_pred']
             correctness+= metric_preds['correctness']
-            print("All lengths are:", len(step_pred), len(gt), len(problem_pred), len(correctness))
+            # print("All lengths are:", len(step_pred), len(gt), len(problem_pred), len(correctness))
 
             
         step_metrics = binary_classification_metrics(step_pred, gt) ## dict of metrics
@@ -506,10 +506,8 @@ class ReweightingEngine(Engine):
         if (args.overfit == -1) and (not args.sanity_check):
             if ddp_true:
                 base_model = self.lower.module.module.base_model.module
-                upper_model = self.upper.module
             else:
                 base_model = self.lower.module.base_model
-                upper_model = self.upper
                 
             if args.peft_rank != -1:
                 base_model.save_pretrained(f"{args.weights_path}/lower_weights")
@@ -521,6 +519,10 @@ class ReweightingEngine(Engine):
         
         #### log this domain weights to wandb # self.raw_weights = nn.Parameter(torch.zeros(self.num_domains))
         if not args.baseline:
+            if ddp_true:
+                upper_model = self.upper.module
+            else:
+                upper_model = self.upper
             torch.save(
                 upper_model.state_dict(),
                 f"{args.weights_path}/domain_weights.pt",
