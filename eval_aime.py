@@ -81,6 +81,7 @@ def infer(file_outputs, data_name = "aime", split = "test", data_dir = "./", sta
     correct_cnt = 0
     majorty_voting_is_correct_cnt = 0
     a = []
+    woorst_possible_score = 0
     for i in range(len(file_outputs)):
         d = examples[i]
         gt_cot, gt_ans = parse_ground_truth(d, data_name)
@@ -88,6 +89,9 @@ def infer(file_outputs, data_name = "aime", split = "test", data_dir = "./", sta
         a.append(gt_ans)
         # generated_responses = ['\n'.join(file_outputs[i]['generated_responses'])]
         generated_answers = [extract_answer(generated_response, data_name) for generated_response in generated_responses]
+        not_gt = [t!=gt_ans for t in generated_answers]
+        if not any(not_gt):
+            woorst_possible_score+=1
         majorty_voting = get_majority_voting(generated_answers)
         is_correct_list = [check_is_correct(generated_answer, gt_ans) for generated_answer in generated_answers]
         majorty_voting_is_correct = check_is_correct(majorty_voting, gt_ans)
@@ -116,8 +120,8 @@ def infer(file_outputs, data_name = "aime", split = "test", data_dir = "./", sta
             else:
                 pass_at_k_list.append(0)
                 
-    print(a)
-
+    # print(a)
+    # print(f"Worst possible score: {woorst_possible_score}/{len(examples)} = {woorst_possible_score / len(examples):.4f}")
     print(f"Pass@{len(generated_answers)}:  {correct_cnt}/{len(examples)} = {correct_cnt / len(examples):.4f}")
     print(f"Consensus (majority voting): {majorty_voting_is_correct_cnt}/{len(examples)} = {majorty_voting_is_correct_cnt / len(examples):.4f}")
 
