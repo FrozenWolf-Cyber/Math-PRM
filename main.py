@@ -654,7 +654,7 @@ else:
         ### Initial validation results
         if get_rank() == 0:
             print("Running initial validation for sanity check or overfit mode")
-            # engine.validation()
+            engine.validation()
             
         print("Waiting for all processes to complete initial validation...")
         print(f"[{get_rank()}] Waiting for all processes to complete initial validation...")
