@@ -425,6 +425,7 @@ class Lower(ImplicitProblem):
         return train_dataloader
 
     def configure_module(self):
+        print("Configuring lower model with device:", device)
         model = configure_module(args, device)
         
         if args.load_path != "":
