@@ -347,7 +347,8 @@ class Lower(ImplicitProblem):
     def training_step(self, batch):
         global iter_num, pbar
         iter_num+=1
-        pbar.update(1)
+        if get_rank() == 0 and pbar is not None:
+            pbar.update(1)
         labels = batch['label'].to(dtype=torch.float).to(device)
         # print("Lower shapes", batch['input_ids'].shape, labels.shape, batch['correctness'])
         domain_strings = batch['dataset']
