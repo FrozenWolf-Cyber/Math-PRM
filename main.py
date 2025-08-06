@@ -613,6 +613,7 @@ class ReweightingEngine(Engine):
                 log_dict.update({f"{ds_name}/{model_name}_score": score})
                 all_scores[f"{ds_name}_{model_name}"] = score
                 
+        print("Logging all scores to wandb:", all_scores)
         wandb.log(log_dict)
 
 
@@ -661,7 +662,6 @@ else:
             print("Running initial validation for sanity check or overfit mode")
             engine.validation()
             
-        print("Waiting for all processes to complete initial validation...")
         print(f"[{get_rank()}] Waiting for all processes to complete initial validation...")
         torch.distributed.barrier()  # Ensure all processes complete validation before starting training
     else:
