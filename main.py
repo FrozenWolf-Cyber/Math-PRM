@@ -589,7 +589,7 @@ class ReweightingEngine(Engine):
                 test_dataloader = dataloader_benchmark[ds_name][model_name]
                 predictions = None
                 
-                for batch in test_dataloader:
+                for batch in tqdm(test_dataloader):
                     if args.max_step_size == -1:
                         max_step_size = len(batch['input_ids'])
                     else:
