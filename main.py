@@ -177,7 +177,7 @@ print("---------------"*10, "\n\n")
 
 ### log the configurations to wandb
 mode = args.wandb_mode
-
+pbar=None
 if get_rank()==0:
     wandb.init(project="DreamPRM-AIME", mode=mode, config=args)
     pbar = tqdm(total=args.iteration_num, desc="Training Progress")
@@ -345,7 +345,7 @@ class Lower(ImplicitProblem):
         return self.module(input_ids, attention_mask, no_grad=no_grad)
 
     def training_step(self, batch):
-        global iter_num
+        global iter_num, pbar
         iter_num+=1
         pbar.update(1)
         labels = batch['label'].to(dtype=torch.float).to(device)
