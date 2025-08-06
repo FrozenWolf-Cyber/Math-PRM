@@ -588,6 +588,8 @@ class ReweightingEngine(Engine):
         all_scores = {}
         for ds_name in dataloader_benchmark:
             for model_name in tqdm(dataloader_benchmark[ds_name]):
+                if ("o4-mini" not in model_name) or ("o4-mini-8-diverse" in model_name):
+                    continue  # Skip models that are not o4-mini or o4-mini-8-diverse
                 print(f"Evaluating {ds_name} with {model_name}")
                 test_dataloader = dataloader_benchmark[ds_name][model_name]
                 predictions = None
