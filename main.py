@@ -579,7 +579,9 @@ class ReweightingEngine(Engine):
             print("Domain Weights:", wts)
             ### separate line for each domain
             to_log = {inv_domain_list[i]: wts[i] for i in range(len(domain_list))}
-            wandb.log(to_log)
+            if get_rank() == 0:
+                print("Logging domain weights to wandb:", to_log)
+                wandb.log(to_log)
             
 
         all_scores = {}
@@ -614,7 +616,8 @@ class ReweightingEngine(Engine):
                 all_scores[f"{ds_name}_{model_name}"] = score
                 
         print("Logging all scores to wandb:", all_scores)
-        wandb.log(log_dict)
+        if get_rank() == 0:
+            wandb.log(log_dict)
 
 
         all_scores["loss"] = 1
@@ -658,9 +661,9 @@ if args.evaluate_only:
 else:
     if (not args.sanity_check) and (args.overfit==-1):
         ### Initial validation results
-        if get_rank() == 0:
-            print("Running initial validation for sanity check or overfit mode")
-            engine.validation()
+        # if get_rank() == 0:
+        #     print("Running initial validation for sanity check or overfit mode")
+        engine.validation()
             
         print(f"[{get_rank()}] Waiting for all processes to complete initial validation...")
         torch.distributed.barrier()  # Ensure all processes complete validation before starting training
