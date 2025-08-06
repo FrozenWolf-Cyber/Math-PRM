@@ -667,3 +667,5 @@ else:
         
     print("\n\n",'---'*5, "Starting training...", '---'*5, )
     engine.run()
+
+    engine.validation()
