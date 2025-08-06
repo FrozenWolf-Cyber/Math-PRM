@@ -166,8 +166,6 @@ resume_labels = None
 devices_count = torch.cuda.device_count()
 args.iteration_num = int((args.epoch * len(train_dataloader))/ devices_count)
 
-if get_rank() == 0:
-    wandb.config.update({"effective_iteration_num": args.iteration_num}, allow_val_change=True)
 
 print("\n\n","---------------"*10)
 print(f"Total devices: {devices_count} Total iterations (epoch*len/devices): {args.iteration_num}, Epochs: {args.epoch}, Train Dataloader Size: {len(train_dataloader)}")
