@@ -492,6 +492,7 @@ class Lower(ImplicitProblem):
 class ReweightingEngine(Engine):
     @torch.no_grad()
     def validation(self):
+        print("Running validation... ranking:", get_rank())
         global iter_num
         log_dict = {}
         step_pred, gt, problem_pred, correctness = [], [], [], []
