@@ -96,10 +96,11 @@ domain_list = {'Algebra':0,
  'Precalculus':6}
 
 def get_best_dtype():
-    capability = torch.cuda.get_device_capability()
-    # Ampere and above (sm_80, 8.0) supports bfloat16
-    supports_bfloat16 = capability >= (8, 0)
-    return torch.bfloat16 if supports_bfloat16 else torch.float32
+    # capability = torch.cuda.get_device_capability()
+    return torch.bfloat16
+    # # Ampere and above (sm_80, 8.0) supports bfloat16
+    # supports_bfloat16 = capability >= (8, 0)
+    # return torch.bfloat16 if supports_bfloat16 else torch.float32
 
 if get_best_dtype() == torch.bfloat16:
     print("Using bfloat16 precision")
