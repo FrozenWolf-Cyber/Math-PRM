@@ -19,6 +19,7 @@ import gc
 from model import round_robin_batch_ordering
 from peft import PeftModel
  
+torch.cuda.init()
 parser = argparse.ArgumentParser(description="DreamPRM")
 parser.add_argument('--weights_path', type=str)
 parser.add_argument("--iteration_num", type=int, default=100000)
