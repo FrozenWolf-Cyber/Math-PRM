@@ -541,7 +541,7 @@ class ReweightingEngine(Engine):
             step_save = True   
         if (args.overfit == -1) and (not args.sanity_check) and iter_num!=0:
             if ddp_true:
-                base_model = self.lower.module.base_model.module
+                base_model = self.lower.module.module.base_model
             else:
                 base_model = self.lower.module.base_model
                 
