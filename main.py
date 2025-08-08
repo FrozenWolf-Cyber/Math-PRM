@@ -539,7 +539,7 @@ class ReweightingEngine(Engine):
             print(f"Saving lower weights at iteration {iter_num} to {args.weights_path}/lower_weights")
             step_name = (iter_num+1) // save_every
             step_save = True   
-        if (args.overfit == -1) and (not args.sanity_check) and iter_num!=0:
+        if (args.overfit == -1) and (not args.sanity_check):
             if ddp_true:
                 base_model = self.lower.module.module.base_model
                 LN = self.lower.module.module.LN
