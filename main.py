@@ -542,17 +542,19 @@ class ReweightingEngine(Engine):
         if (args.overfit == -1) and (not args.sanity_check) and iter_num!=0:
             if ddp_true:
                 base_model = self.lower.module.module.base_model
+                LN = self.lower.module.module.LN
             else:
                 base_model = self.lower.module.base_model
+                LN = self.lower.module.LN
                 
 
             base_model.save_pretrained(f"{args.weights_path}/lower_weights")
-            torch.save(self.lower.module.LN.state_dict(), f"{args.weights_path}/lower_weights_LN.pt")
+            torch.save(LN.state_dict(), f"{args.weights_path}/lower_weights_LN.pt")
 
             if step_save:
                 print(f"Saving last step weights at iteration {iter_num} to {args.weights_path}/lower_weights_step.pt") 
                 base_model.save_pretrained(f"{args.weights_path}/lower_weights_step_{step_name}")
-                torch.save(self.lower.module.LN.state_dict(), f"{args.weights_path}/lower_weights_LN_step_{step_name}.pt")
+                torch.save(LN.state_dict(), f"{args.weights_path}/lower_weights_LN_step_{step_name}.pt")
         
         #### log this domain weights to wandb # self.raw_weights = nn.Parameter(torch.zeros(self.num_domains))
         if not args.baseline:
