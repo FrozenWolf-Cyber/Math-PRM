@@ -352,6 +352,7 @@ class Lower(ImplicitProblem):
         iter_num+=1
         if get_rank() == 0 and pbar is not None:
             pbar.update(1)
+            wandb.log({"iter_num": iter_num})
         labels = batch['label'].to(dtype=torch.float).to(device)
         # print("Lower shapes", batch['input_ids'].shape, labels.shape, batch['correctness'])
         domain_strings = batch['dataset']
@@ -640,7 +641,7 @@ engine_config = EngineConfig(
     valid_step=args.save_every_iterations,
     strategy=args.strategy,
     roll_back=args.rollback,
-    logger_type="wandb",
+    # logger_type="wandb",
 )
 upper = Upper(name="upper", config=upper_config, ddp_check_parameters=False)
 lower = Lower(name="lower", config=lower_config, ddp_check_parameters=False)
