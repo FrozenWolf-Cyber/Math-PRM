@@ -420,7 +420,7 @@ class Lower(ImplicitProblem):
         if args.baseline or args.retrain:
             loss = torch.mean(loss)  # (B, )    
             if get_rank()==0:
-                lr = self.optimizer.param_groups[0]['lr']
+                lr = self.optimizer.param_groups[0]['lr'].item()
                 wandb.log({"inner_loss": loss.cpu().item(),"lr": lr })
             return loss
 
