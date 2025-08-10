@@ -420,7 +420,8 @@ class Lower(ImplicitProblem):
         if args.baseline or args.retrain:
             loss = torch.mean(loss)  # (B, )    
             if get_rank()==0:
-                wandb.log({"inner_loss": loss.cpu().item(),})
+                lr = self.optimizer.param_groups[0]['lr']
+                wandb.log({"inner_loss": loss.cpu().item(),"lr": lr })
             return loss
 
         loss = loss.unsqueeze(1)  # (B, 1)
@@ -438,9 +439,8 @@ class Lower(ImplicitProblem):
         if len(lower_loss) == inner_log_every:
             mean_inner_loss = np.mean(lower_loss)
             mean_inner_weighted_loss = np.mean(lower_weighted_loss)
-            lr = self.optimizer.param_groups[0]['lr']
             wandb.log({"inner_loss": mean_inner_loss,
-                       "inner_weighted_loss": mean_inner_weighted_loss, "lr": lr })
+                       "inner_weighted_loss": mean_inner_weighted_loss})
             
             # print(f"Inner Loss: {mean_inner_loss}, Inner Weighted Loss: {mean_inner_weighted_loss}")
             lower_loss.clear()
