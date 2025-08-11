@@ -147,6 +147,7 @@ def configure_module(args, device):
         if args.peft_rank != -1:
             model.base_model = PeftModel.from_pretrained(model.base_model, adapter_path)
             # Debug: Check for missing keys
+            print("Loading adapter state from:", adapter_path)
             adapter_state = load_file(f"{adapter_path}/adapter_model.safetensors")
             new_state = OrderedDict()
             for k, v in adapter_state.items():
