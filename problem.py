@@ -35,8 +35,10 @@ class Problem:
         scheduler=None,
         train_data_loader=None,
         extra_config=None,
+        ddp_check_parameters=False
     ):
         # basic configurations
+        self.ddp_check_parameters = ddp_check_parameters
         self._name = name
         self._config = config if config is not None else Config()
         self.cfg = extra_config
@@ -225,7 +227,7 @@ class Problem:
             self.module = torch.nn.parallel.DistributedDataParallel(
                 module=self.module,
                 gradient_as_bucket_view=True,
-                find_unused_parameters=True,
+                find_unused_parameters=self.ddp_check_parameters,
             )
         elif self._strategy == "fsdp":
             if self.is_rank_zero():

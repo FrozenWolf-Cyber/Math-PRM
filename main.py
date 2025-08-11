@@ -190,6 +190,7 @@ pbar=None
 if get_rank()==0:
     wandb.init(project="DreamPRM-AIME", mode=mode, config=args)
     pbar = tqdm(total=args.iteration_num, desc="Training Progress")
+    pbar.update(args.resume_from_step if args.resume_from_step != -1 else 0)
 
     if not sanity_check:
         run_name = wandb.run.name
