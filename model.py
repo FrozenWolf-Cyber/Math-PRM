@@ -145,7 +145,7 @@ def configure_module(args, device):
         adapter_path = f"{args.load_path}/lower_weights"
 
         if args.peft_rank != -1:
-            model.base_model = PeftModel.from_pretrained(model.base_model, adapter_path)
+            # model.base_model = PeftModel.from_pretrained(model.base_model, adapter_path)
             # Debug: Check for missing keys
             adapter_state = load_file(f"{adapter_path}/adapter_model.safetensors")
             new_state = OrderedDict()
