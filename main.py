@@ -355,6 +355,7 @@ class Lower(ImplicitProblem):
         return self.module(input_ids, attention_mask, no_grad=no_grad)
 
     def training_step(self, batch):
+        print("DEBUG GPU", get_rank(), "Lower training step", iter_num, batch['input_ids'].shape)
         global iter_num, pbar
         iter_num+=1
         if get_rank() == 0 and pbar is not None:
