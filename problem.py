@@ -185,7 +185,7 @@ class Problem:
             for train_data_loader in self.train_data_loader:
                 iter_dl = iter(train_data_loader)
                 if self.cfg["resume_step_from"] is not None:
-                    print("-----------Resuming from step", self.cfg.get["resume_step_from"])
+                    print("-----------Resuming from step", self.cfg["resume_step_from"])
                     iter_dl = islice(iter_dl, self.cfg["resume_step_from"], None)
                  
                 self.train_data_iterator.append(iter_dl)
