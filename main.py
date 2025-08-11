@@ -68,6 +68,7 @@ parser.add_argument("--lora_dropout", type=float, default=0.05, help="Dropout fo
 parser.add_argument("--load_path", type=str, default="", help="Path to load the model from")
 parser.add_argument("--evaluate_only", action="store_true")
 parser.add_argument("--balance", action="store_true")
+parser.add_argument("--resume_from_step", type=int, default=-1, help="Resume from a specific step, -1 for no resume")
 
 def get_rank():
     if "RANK" in os.environ:
@@ -118,7 +119,7 @@ if sanity_check:
 if not os.path.exists(args.weights_path):
     os.makedirs(args.weights_path)
 
-iter_num = 0
+iter_num = args.resume_from_step+1 if args.resume_from_step != -1 else 0
 if sanity_check:
     args.save_every_iterations = 100
     args.iteration_num = 200
@@ -172,6 +173,11 @@ print("\n\n","---------------"*10)
 print(f"Total devices: {devices_count} Total iterations (epoch*len/devices): {args.iteration_num}, Epochs: {args.epoch}, Train Dataloader Size: {len(train_dataloader)}")
 save_every = args.iteration_num //args.save_weights_n_times
 print(f"Saving weights at steps: {[i for i in range(0, args.iteration_num, save_every)]}")
+if args.resume_from_step != -1:
+    print(f"Resuming from step {args.resume_from_step}")
+    
+
+
 step_size=args.iteration_num // args.scheduler_steps
 print("Step Learning Rate Scheduler Steps:", args.scheduler_steps, "Step Size:", step_size, "Gamma:", args.scheduler_gamma)
 for i in range(args.scheduler_steps+1):
@@ -479,13 +485,14 @@ class Lower(ImplicitProblem):
     def configure_optimizer(self):
         optimizer = AdamW(
             self.module.parameters(),
-            lr=args.lr,
+            lr=args.lr
         )
         return optimizer
 
     def configure_scheduler(self):
         scheduler = optim.lr_scheduler.StepLR(
-            self.optimizer, step_size=args.iteration_num // args.scheduler_steps, gamma=args.scheduler_gamma
+            self.optimizer, step_size=args.iteration_num // args.scheduler_steps, gamma=args.scheduler_gamma,
+            last_epoch= args.resume_from_step 
         )
         return scheduler
 
@@ -643,8 +650,8 @@ engine_config = EngineConfig(
     roll_back=args.rollback,
     # logger_type="wandb",
 )
-upper = Upper(name="upper", config=upper_config, ddp_check_parameters=False)
-lower = Lower(name="lower", config=lower_config, ddp_check_parameters=False)
+upper = Upper(name="upper", config=upper_config, ddp_check_parameters=False, extra_config={"resume_step_from": args.resume_from_step if args.resume_from_step != -1 else None})
+lower = Lower(name="lower", config=lower_config, ddp_check_parameters=False, extra_config={"resume_step_from": args.resume_from_step if args.resume_from_step != -1 else None})
 
 if args.baseline or args.retrain:
     problems = [lower]

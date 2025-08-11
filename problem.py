@@ -8,7 +8,7 @@ import abc
 
 import torch
 import torch.distributed as dist
-
+from itertools import islice
 from betty.patch.data_loader import get_distributed_data_loader
 from betty.patch.optimizer import patch_optimizer
 from betty.patch.scheduler import patch_scheduler
@@ -35,10 +35,8 @@ class Problem:
         scheduler=None,
         train_data_loader=None,
         extra_config=None,
-        ddp_check_parameters=False
     ):
         # basic configurations
-        self.ddp_check_parameters = ddp_check_parameters
         self._name = name
         self._config = config if config is not None else Config()
         self.cfg = extra_config
@@ -183,7 +181,12 @@ class Problem:
             self.train_data_iterator = []
             self.epoch_counter = []
             for train_data_loader in self.train_data_loader:
-                self.train_data_iterator.append(iter(train_data_loader))
+                iter_dl = iter(train_data_loader)
+                if self.cfg.get("resume_step_from", None) is not None:
+                    print("-----------Resuming from step", self.cfg.get["resume_step_from"])
+                    iter_dl = islice(iter_dl, self.cfg["resume_step_from"], None)
+                 
+                self.train_data_iterator.append(iter_dl)
                 self.epoch_counter.append(0)
 
         # Logging INFO
@@ -222,7 +225,7 @@ class Problem:
             self.module = torch.nn.parallel.DistributedDataParallel(
                 module=self.module,
                 gradient_as_bucket_view=True,
-                find_unused_parameters=self.ddp_check_parameters,
+                find_unused_parameters=True,
             )
         elif self._strategy == "fsdp":
             if self.is_rank_zero():
