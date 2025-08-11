@@ -462,12 +462,12 @@ class Lower(ImplicitProblem):
         print("Configuring lower model with device:", device)
         model = configure_module(args, device)
         
-        if args.load_path != "":
-            if args.peft_rank != -1:
-                model.base_model = PeftModel.from_pretrained(model.base_model, f"{args.load_path}/lower_weights")
-            else:
-                model.base_model.from_pretrained(f"{args.load_path}/lower_weights")
-            model.LN.load_state_dict(torch.load(f"{args.load_path}/lower_weights_LN.pt"))
+        # if args.load_path != "":
+        #     if args.peft_rank != -1:
+        #         model.base_model = PeftModel.from_pretrained(model.base_model, f"{args.load_path}/lower_weights")
+        #     else:
+        #         model.base_model.from_pretrained(f"{args.load_path}/lower_weights")
+        #     model.LN.load_state_dict(torch.load(f"{args.load_path}/lower_weights_LN.pt"))
         
         model.base_model = model.base_model.to(device)
         model.LN = model.LN.to(device)

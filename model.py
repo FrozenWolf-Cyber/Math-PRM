@@ -142,9 +142,11 @@ def configure_module(args, device):
         model = QwenMathCondGen_RM(device, args)
         
     if args.load_path!="":   
+        print("Loading model from path:", args.load_path)
         adapter_path = f"{args.load_path}/lower_weights"
 
         if args.peft_rank != -1:
+            print("Loading PEFT model with LoRA configuration from path:", adapter_path)
             model.base_model = PeftModel.from_pretrained(model.base_model, adapter_path)
             # Debug: Check for missing keys
             # print("Loading adapter state from:", adapter_path)
