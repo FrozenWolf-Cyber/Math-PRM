@@ -665,8 +665,8 @@ engine_config = EngineConfig(
     roll_back=args.rollback,
     # logger_type="wandb",
 )
-upper = Upper(name="upper", config=upper_config, ddp_check_parameters=False, extra_config={"resume_step_from": args.resume_from_step if args.resume_from_step != -1 else None})
-lower = Lower(name="lower", config=lower_config, ddp_check_parameters=False, extra_config={"resume_step_from": args.resume_from_step if args.resume_from_step != -1 else None})
+upper = Upper(name="upper", config=upper_config, ddp_check_parameters=False, extra_config=None)#={"resume_step_from": args.resume_from_step if args.resume_from_step != -1 else None})
+lower = Lower(name="lower", config=lower_config, ddp_check_parameters=False, extra_config=None)#={"resume_step_from": args.resume_from_step if args.resume_from_step != -1 else None})
 
 if args.baseline or args.retrain:
     problems = [lower]
