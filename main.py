@@ -69,6 +69,7 @@ parser.add_argument("--load_path", type=str, default="", help="Path to load the 
 parser.add_argument("--evaluate_only", action="store_true")
 parser.add_argument("--balance", action="store_true")
 parser.add_argument("--resume_from_step", type=int, default=-1, help="Resume from a specific step, -1 for no resume")
+parser.add_argument("--init_eval_off", action="store_true", help="Whether to evaluate the model after initialization")
 
 def get_rank():
     if "RANK" in os.environ:
@@ -691,7 +692,10 @@ else:
         ### Initial validation results
         # if get_rank() == 0:
         #     print("Running initial validation for sanity check or overfit mode")
-        engine.validation()
+        if not args.init_eval_off:
+            engine.validation()
+        else:
+            print("Skipping initial validation for sanity check or overfit mode")
             
         print(f"[{get_rank()}] Waiting for all processes to complete initial validation...")
         if ddp_true:
