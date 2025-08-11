@@ -488,6 +488,12 @@ class Lower(ImplicitProblem):
             self.module.parameters(),
             lr=args.lr
         )
+        if args.resume_from_step != -1:
+            print(f"Resuming optimizer state from step {args.resume_from_step}")
+            for i, param_group in enumerate(optimizer.param_groups):
+                if "initial_lr" not in param_group:
+                    param_group["initial_lr"] = param_group["lr"]
+                
         return optimizer
 
     def configure_scheduler(self):
