@@ -158,7 +158,8 @@ def configure_module(args, device):
                     new_k = k
 
 
-                new_k =  new_k[17:]
+                # new_k =  new_k[17:]
+                new_k = 'base_model.model.' + new_k
                 new_state[new_k] = v
 
             adapter_state = new_state
