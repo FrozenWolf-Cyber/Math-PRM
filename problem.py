@@ -187,7 +187,7 @@ class Problem:
                 if self.cfg["resume_step_from"] is not None:
                     print("-----------Resuming from step", self.cfg["resume_step_from"])
                     # iter_dl = islice(iter_dl, self.cfg["resume_step_from"], None)
-                    for batch_idx, batch in tqdm(enumerate(iter_dl)):
+                    for batch_idx, batch in tqdm(enumerate(iter_dl), total=len(iter_dl)):
                         if batch_idx < self.cfg["resume_step_from"]:
                             continue
                 self.train_data_iterator.append(iter_dl)
