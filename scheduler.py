@@ -3,7 +3,8 @@ import inspect
 
 def patch_scheduler(scheduler, optimizer):
     for group in optimizer.param_groups:
-        group.setdefault("initial_lr", group["lr"])
+        if "initial_lr" not in group:
+            group.setdefault("initial_lr", group["lr"])
     kwargs = {}
     sig = inspect.signature(scheduler.__class__.__init__)
     for param in sig.parameters:
