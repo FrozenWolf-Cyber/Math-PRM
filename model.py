@@ -145,7 +145,7 @@ def configure_module(args, device):
         adapter_path = f"{args.load_path}/lower_weights"
 
         if args.peft_rank != -1:
-            # model.base_model = PeftModel.from_pretrained(model.base_model, adapter_path)
+            model.base_model = PeftModel.from_pretrained(model.base_model, adapter_path)
             # Debug: Check for missing keys
             adapter_state = load_file(f"{adapter_path}/adapter_model.safetensors")
             new_state = OrderedDict()
@@ -165,13 +165,13 @@ def configure_module(args, device):
             model_keys = [k for k, _ in model.base_model.named_parameters() if "lora" in k]
             print("\n=== Model Keys ===")
             for k in model_keys:
-                if k not in adapter_state:
-                    print(f"Missing key in adapter state: {k}")
+                # if k not in adapter_state:
+                print(f"Missing key in adapter state: {k}")
 
             print("\n=== Missing Adapter Keys ===")
             for k in adapter_state.keys():
-                if k not in model_keys:
-                    print(k)
+                # if k not in model_keys:
+                print(k)
 
             set_peft_model_state_dict(model.base_model, new_state)
         else:
