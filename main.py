@@ -564,11 +564,15 @@ class ReweightingEngine(Engine):
 
             base_model.save_pretrained(f"{args.weights_path}/lower_weights")
             torch.save(LN.state_dict(), f"{args.weights_path}/lower_weights_LN.pt")
-
+            ## save optimizer:
+            torch.save(self.lower.optimizer.state_dict(), f"{args.weights_path}/lower_optimizer.pt")
+            
+            
             if step_save:
                 print(f"Saving last step weights at iteration {iter_num} to {args.weights_path}/lower_weights_step.pt") 
                 base_model.save_pretrained(f"{args.weights_path}/lower_weights_step_{step_name}")
                 torch.save(LN.state_dict(), f"{args.weights_path}/lower_weights_LN_step_{step_name}.pt")
+                torch.save(self.lower.optimizer.state_dict(), f"{args.weights_path}/lower_optimizer_step_{step_name}.pt")
         
         #### log this domain weights to wandb # self.raw_weights = nn.Parameter(torch.zeros(self.num_domains))
         if not args.baseline:
@@ -580,12 +584,14 @@ class ReweightingEngine(Engine):
                 upper_model.state_dict(),
                 f"{args.weights_path}/domain_weights.pt",
             )
+            torch.save(self.upper.optimizer.state_dict(), f"{args.weights_path}/domain_optimizer.pt")
             
             if step_save:
                 print(f"Saving upper weights at iteration {iter_num} to {args.weights_path}/domain_weights.pt")
                 torch.save(
                     upper_model.state_dict(),
                     f"{args.weights_path}/domain_weights_step_{step_name}.pt",)
+                torch.save(self.upper.optimizer.state_dict(), f"{args.weights_path}/domain_optimizer_step_{step_name}.pt")
             
             wts = upper_model.module.raw_weights
             print("Raw Weights:", wts)
