@@ -356,7 +356,7 @@ class Lower(ImplicitProblem):
 
     def training_step(self, batch):
         global iter_num, pbar
-        print("DEBUG GPU", get_rank(), "Lower training step", iter_num, batch['input_ids'].shape)
+        print("\nDEBUG GPU", get_rank(), "Lower training step", iter_num, batch['input_ids'].shape)
         
         iter_num+=1
         if get_rank() == 0 and pbar is not None:
