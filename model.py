@@ -148,20 +148,20 @@ def configure_module(args, device):
             model.base_model = PeftModel.from_pretrained(model.base_model, adapter_path)
             # Debug: Check for missing keys
             adapter_state = load_file(f"{adapter_path}/adapter_model.safetensors")
-            new_state = OrderedDict()
-            for k, v in adapter_state.items():
-                if ".lora_A.weight" in k:
-                    new_k = k.replace(".lora_A.weight", ".lora_A.default.weight")
-                elif ".lora_B.weight" in k:
-                    new_k = k.replace(".lora_B.weight", ".lora_B.default.weight")
-                else:
-                    new_k = k
+            # new_state = OrderedDict()
+            # for k, v in adapter_state.items():
+            #     if ".lora_A.weight" in k:
+            #         new_k = k.replace(".lora_A.weight", ".lora_A.default.weight")
+            #     elif ".lora_B.weight" in k:
+            #         new_k = k.replace(".lora_B.weight", ".lora_B.default.weight")
+            #     else:
+            #         new_k = k
 
 
-                # new_k =  new_k[17:]
-                new_state[new_k] = v
+            #     # new_k =  new_k[17:]
+            #     new_state[new_k] = v
 
-            adapter_state = new_state
+            # adapter_state = new_state
             model_keys = [k for k, _ in model.base_model.named_parameters() if "lora" in k]
             print("\n=== Model Keys ===")
             for k in model_keys:
@@ -173,7 +173,7 @@ def configure_module(args, device):
                 if k not in model_keys:
                     print(k)
 
-            set_peft_model_state_dict(model.base_model, new_state)
+            set_peft_model_state_dict(model.base_model, adapter_state)
         else:
             model.base_model.from_pretrained(adapter_path)
 
