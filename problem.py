@@ -184,7 +184,7 @@ class Problem:
             self.epoch_counter = []
             for train_data_loader in self.train_data_loader:
                 iter_dl = iter(train_data_loader)
-                if self.cfg.get("resume_step_from", None) is not None:
+                if self.cfg["resume_step_from"] is not None:
                     print("-----------Resuming from step", self.cfg.get["resume_step_from"])
                     iter_dl = islice(iter_dl, self.cfg["resume_step_from"], None)
                  
