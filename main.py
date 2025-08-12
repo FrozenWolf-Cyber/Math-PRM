@@ -222,7 +222,7 @@ class Upper(ImplicitProblem):
     def training_step(self, batch):
         labels = batch['label'].to(device) ## (B, T)
         correctness = torch.tensor(batch['correctness'], dtype=torch.float).to(device) ## (B, )
-        print("Upper shapes", batch['input_ids'].shape, labels.shape, correctness)
+        print("Upper shapes", batch['input_ids'].shape, labels.shape, correctness, flush=True)
         max_meta_steps_grad = args.max_meta_steps_grad
         if args.max_step_size == -1:
             max_step_size = len(batch['input_ids'])
@@ -245,7 +245,7 @@ class Upper(ImplicitProblem):
           
             batch['index'] = batch['index'][reverse_indices]
             batch['index'] = batch['index'].tolist()
-            print("Batch index after reverse:", batch['index'])
+            print("Batch index after reverse:", batch['index'], flush=True)
             score = score[reverse_indices] # (B, T*(T+1)/2)
         else:
             score = unbatch_process(batch, device, self.lower, max_step_size)
@@ -281,13 +281,13 @@ class Upper(ImplicitProblem):
                 loss = loss.sum() / mask.sum()
                 
         else:
-            print("Upper score ", score)
+            print("Upper score ", score, flush=True)
             # print("batch['index']:", batch['index'], score.device)
             ### using overall problem solution correctness
             nproblems = set(batch['index']) # [0, 1, 2, B_Size-1]
             # score -> (B * T*(T+1)/2) So [A_0_1, A_0_2,.. B_0_1, B_0_2,...] in cummulative order
             score = torch.log(score / (1 - score))
-            print(score.shape)
+            print(score.shape, flush=True)
             outputs = []
             for i in nproblems:
                 mean_score = 0
@@ -307,12 +307,12 @@ class Upper(ImplicitProblem):
             ## outputs -> (B, )
             ## label -> ## (B * T*(T+1)/2)
             outputs = torch.stack(outputs) # (B, )
-            print("Outputs shape:", outputs.shape, "Correctness shape:", correctness.shape)
+            print("Outputs shape:", outputs.shape, "Correctness shape:", correctness.shape, flush=True)
             outputs = torch.sigmoid(outputs)
-            print("Upper outputs:", outputs)
+            print("Upper outputs:", outputs, flush=True)
             loss = criterion_meta(outputs, correctness)
                 
-        print("DEBUG", "UPPER", loss )
+        print("DEBUG", "UPPER", loss , flush=True)
         if torch.isnan(loss).any() or torch.isinf(loss).any():
             ## clip the loss to avoid NaN
             print("NaN loss detected, clipping to zero upper loss")
@@ -360,7 +360,7 @@ class Lower(ImplicitProblem):
 
     def training_step(self, batch):
         global iter_num, pbar
-        print("\nDEBUG GPU", get_rank(), "Lower training step", iter_num, batch['input_ids'].shape)
+        print("\nDEBUG GPU", get_rank(), "Lower training step", iter_num, batch['input_ids'].shape, flush=True)
         
         iter_num+=1
         if get_rank() == 0 and pbar is not None:
