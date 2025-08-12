@@ -9,6 +9,7 @@ import numpy as np
 from tqdm.auto import tqdm
 from tqdm import tqdm
 import pickle
+from collections import Counter
 tqdm.pandas()
 
 SANITY_CHECK = False
@@ -446,6 +447,10 @@ def build_dataloader(
             meta_dataset =  QwenMathDataset(meta_dataset, tokenizer, has_subjects=False, filter_dataset_steps=filter_dataset_steps, filter_dataset_token_size=filter_dataset_token_size)
 
         pickle.dump(meta_dataset, open(cache_meta_name, "wb"))
+
+    ## print correctness value count:
+    print("Meta dataset correctness value counts after clipping:")
+    print(meta_dataset.dataset.to_pandas()['correctness'].value_counts())
 
     meta_dataloader = DataLoader(meta_dataset, batch_size=meta_batch_size, shuffle=False if sanity_check else True, collate_fn=collate_merge_minibatch)
     next(iter(meta_dataloader))  
