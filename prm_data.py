@@ -438,7 +438,7 @@ def build_dataloader(
      
      
     cache_meta_name = f"qwen_math_meta_dataset_{meta_dataset_n}_{len(meta_dataset)}_steps_{filter_dataset_steps}_token_size_{filter_dataset_token_size}_token_based{token_based}_{add_new_token}.pkl"
-    if False:#os.path.exists(cache_meta_name):
+    if os.path.exists(cache_meta_name):
         meta_dataset = pickle.load(open(cache_meta_name, "rb")) 
     else:
         if not token_based:
