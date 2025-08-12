@@ -399,11 +399,11 @@ def build_dataloader(
     assert meta_dataset in ["AIME", "PRM800K", "both"], "Meta dataset must be specified as 'AIME', 'PRM800K', or 'both'."
 
     if meta_dataset == "AIME":
-        meta_dataset = load_data_custom("FrozenWolf/Gemini-AIME-Meta")['train']
+        meta_dataset = load_data_custom("FrozenWolf/Gemini-AIME-Meta-Diverse")['train']
     elif meta_dataset == "PRM800K":
         meta_dataset = data['test']
     elif meta_dataset == "both":
-        meta_dataset1 = load_data_custom("FrozenWolf/Gemini-AIME-Meta")['train']
+        meta_dataset1 = load_data_custom("FrozenWolf/Gemini-AIME-Meta-Diverse")['train']
         meta_dataset2 = data['test']
         df1 = meta_dataset2.to_pandas()[['prompt', 'answer', 'completions', 'correctness', 'labels']]
         df2 = meta_dataset1.to_pandas()[['prompt', 'answer', 'completions', 'correctness', 'labels']]
