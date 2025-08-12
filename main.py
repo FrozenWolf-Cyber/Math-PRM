@@ -675,11 +675,13 @@ if args.baseline or args.retrain:
     problems = [lower]
     u2l, l2u = {}, {}
 else:
+    print("Using both Upper and Lower problems")
     problems = [upper, lower]
     u2l = {upper: [lower]}
     l2u = {lower: [upper]}
 dependencies = {"l2u": l2u, "u2l": u2l}
 
+print("dependencies:", dependencies)
 engine = ReweightingEngine(
     config=engine_config, problems=problems, dependencies=dependencies
 )
