@@ -400,6 +400,9 @@ def build_dataloader(
 
     if meta_dataset == "AIME":
         meta_dataset = load_data_custom("FrozenWolf/Gemini-AIME-Meta-Diverse")['train']
+        ## print correctness value count:
+        print("Meta dataset correctness value counts:")
+        print(meta_dataset.to_pandas()['correctness'].value_counts())
     elif meta_dataset == "PRM800K":
         meta_dataset = data['test']
     elif meta_dataset == "both":
