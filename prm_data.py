@@ -339,10 +339,10 @@ class QwenMathMetaDataset(Dataset):
     
     
 def build_dataloader(
-        tokenizer, train_batch_size, meta_batch_size, inf_batch_size=1, token_based=True, add_new_token=True, meta_dataset="AIME", filter_dataset_steps=-1, filter_dataset_token_size=-1, # "AIME" or "PRM800K"
+        tokenizer, train_batch_size, meta_batch_size, inf_batch_size=1, token_based=True, add_new_token=True, meta_dataset_n="AIME", filter_dataset_steps=-1, filter_dataset_token_size=-1, # "AIME" or "PRM800K"
         sanity_check=False, overfit=-1, balance=False
 ):
-    
+    meta_dataset = meta_dataset_n
     if not add_new_token:
         assert '<|im_end|>' in tokenizer.special_tokens_map['additional_special_tokens'], "Please check if <|im_end|> token to the tokenizer vocab."
         global SEP_TOKEN
@@ -436,17 +436,17 @@ def build_dataloader(
     next(iter(train_dataloader)) 
      
      
-    cache_meta_name = f"qwen_math_meta_dataset_{len(meta_dataset)}_steps_{filter_dataset_steps}_token_size_{filter_dataset_token_size}_token_based{token_based}_{add_new_token}.pkl"
-    if os.path.exists(cache_meta_name):
+    cache_meta_name = f"qwen_math_meta_dataset_{meta_dataset_n}_{len(meta_dataset)}_steps_{filter_dataset_steps}_token_size_{filter_dataset_token_size}_token_based{token_based}_{add_new_token}.pkl"
+    if False:#os.path.exists(cache_meta_name):
         meta_dataset = pickle.load(open(cache_meta_name, "rb")) 
     else:
         if not token_based:
             meta_dataset = QwenMathMetaDataset(meta_dataset, tokenizer, filter_dataset_steps=filter_dataset_steps, filter_dataset_token_size=filter_dataset_token_size)
         else:
             meta_dataset =  QwenMathDataset(meta_dataset, tokenizer, has_subjects=False, filter_dataset_steps=filter_dataset_steps, filter_dataset_token_size=filter_dataset_token_size)
-        
+
         pickle.dump(meta_dataset, open(cache_meta_name, "wb"))
-        
+
     meta_dataloader = DataLoader(meta_dataset, batch_size=meta_batch_size, shuffle=False if sanity_check else True, collate_fn=collate_merge_minibatch)
     next(iter(meta_dataloader))  
 
