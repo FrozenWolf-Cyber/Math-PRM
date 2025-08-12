@@ -338,7 +338,10 @@ class Upper(ImplicitProblem):
             domain_list
         )
         if args.load_path != "":
-            meta_net.load_state_dict(torch.load(f"{args.load_path}/domain_weights.pt"))
+            if f"{args.load_path}/domain_weights.pt" in os.listdir(args.load_path):
+                meta_net.load_state_dict(torch.load(f"{args.load_path}/domain_weights.pt"))
+            else:
+                print(f"!!![Warning] Domain weights not found in {args.load_path}, initializing new weights.")
         return meta_net
 
     def configure_optimizer(self):
