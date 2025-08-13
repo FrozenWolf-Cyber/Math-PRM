@@ -498,10 +498,21 @@ class Lower(ImplicitProblem):
             self.module.parameters(),
             lr=args.lr
         )
+        
+        if args.load_path != "":
+            if f"{args.load_path}/lower_optimizer.pt" in os.listdir(args.load_path):
+                optimizer.load_state_dict(torch.load(f"{args.load_path}/lower_optimizer.pt"))
+                print(f"Loaded optimizer state from {args.load_path}/lower_optimizer.pt")
+            else:
+                print(f"!!![Warning] Lower optimizer state not found in {args.load_path}, initializing new optimizer.")
+        
         if args.resume_from_step != -1:
             print(f"Resuming optimizer state from step {args.resume_from_step}")
-            for group in optimizer.param_groups:
-                group.setdefault('initial_lr', group['lr'])
+            if 'initial_lr' in optimizer.param_groups[0]:
+                print("Optimizer already has initial_lr set, skipping")
+            else:
+                for group in optimizer.param_groups:
+                    group.setdefault('initial_lr', group['lr'])
 
         return optimizer
 
