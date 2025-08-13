@@ -176,9 +176,13 @@ save_every = args.iteration_num //args.save_weights_n_times
 print(f"Saving weights at steps: {[i for i in range(0, args.iteration_num, save_every)]}")
 if args.resume_from_step != -1:
     print(f"Resuming from step {args.resume_from_step}")
+
+if not args.baseline and not args.retrain:
+    print("Training Upper and Lower models")
+    print("Original validation every:", args.save_every_iterations) 
+    args.save_every_iterations = args.save_every_iterations * args.gradiant_accumulation
+    print("New validation every:", args.save_every_iterations)
     
-
-
 step_size=args.iteration_num // args.scheduler_steps
 print("Step Learning Rate Scheduler Steps:", args.scheduler_steps, "Step Size:", step_size, "Gamma:", args.scheduler_gamma)
 for i in range(args.scheduler_steps+1):
