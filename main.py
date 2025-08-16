@@ -500,7 +500,7 @@ class Lower(ImplicitProblem):
         )
         
         if args.load_path != "":
-            if f"{args.load_path}/lower_optimizer.pt" in os.listdir(args.load_path):
+            if "lower_optimizer.pt" in os.listdir(args.load_path):
                 optimizer.load_state_dict(torch.load(f"{args.load_path}/lower_optimizer.pt"))
                 print(f"Loaded optimizer state from {args.load_path}/lower_optimizer.pt")
             else:

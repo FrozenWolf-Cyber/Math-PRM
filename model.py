@@ -178,6 +178,7 @@ def configure_module(args, device):
             #     print(k)
 
             # set_peft_model_state_dict(model.base_model, new_state)
+            model.base_model.enable_adapter_layers()
         else:
             model.base_model.from_pretrained(adapter_path)
 
